@@ -424,34 +424,27 @@ HTML_TEMPLATE = """
         <!-- KARTU 1: PENGAMBILAN CITRA & KAMERA -->
         <div class="card">
           <div class="card-title">
-            <span>📸 1. Jepret / Muat Foto Ufuk</span>
+            <span>📸 1. Muat Citra Ufuk Mar'i</span>
             <span class="badge badge-info" id="statusBadgeInput">Siap</span>
           </div>
 
-          <div class="grid-4">
+          <div class="grid-2">
             <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('galleryInput').click()">
-              📁 Buka File / Foto
+              📁 Buka File / Foto Ufuk
             </button>
             <button type="button" class="btn btn-primary btn-sm" onclick="startLiveCamera()">
-              📹 Kamera / Webcam
-            </button>
-            <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('cameraInput').click()">
-              📸 Jepret Foto
-            </button>
-            <button type="button" class="btn btn-secondary btn-sm" onclick="loadSamplePhoto()">
-              🌄 Contoh Lanskap
+              📹 Kamera / Webcam Laptop
             </button>
           </div>
 
           <input type="file" id="galleryInput" accept="image/*" style="display: none;" onchange="onFileSelected(this)">
-          <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display: none;" onchange="onFileSelected(this)">
 
           <div id="liveCamWrapper">
             <video id="cameraVideo" playsinline autoplay muted></video>
             <canvas id="cameraOverlay"></canvas>
             <div class="cam-controls">
               <button type="button" class="btn-shutter" onclick="captureLiveFrame()">
-                📸 JEPRET FOTO
+                📸 AMBIL FRAME
               </button>
               <button type="button" class="btn-close-cam" onclick="stopLiveCamera()">
                 ✖️ Tutup Kamera
@@ -462,7 +455,7 @@ HTML_TEMPLATE = """
           <div class="photo-area" id="dropArea">
             <p style="font-size: 1.8rem; margin-bottom: 4px;">🏞️</p>
             <p style="font-weight: 700; color: #38bdf8; font-size: 0.88rem;" id="lblPhotoStatus">Belum ada foto yang dipilih</p>
-            <p style="font-size: 0.74rem; color: #64748b; margin-top: 3px;">Pilih berkas foto atau gunakan kamera/webcam di atas</p>
+            <p style="font-size: 0.74rem; color: #64748b; margin-top: 3px;">Klik 'Buka File / Foto Ufuk' atau gunakan Kamera / Webcam Laptop</p>
           </div>
 
           <img id="rawPreview" class="preview-img" alt="Preview Foto Aktif">
@@ -491,16 +484,19 @@ HTML_TEMPLATE = """
 
           <div class="grid-3">
             <div class="form-group">
-              <label>Lintang (Lat):</label>
-              <input type="number" id="inpLat" value="-7.9800" step="0.0001">
+              <label>Lintang / Lat (°):</label>
+              <input type="number" id="inpLat" value="-7.9800" step="0.0001" placeholder="-7.9800">
+              <span style="font-size: 0.68rem; color: #64748b;">LS: minus (-), LU: plus (+)</span>
             </div>
             <div class="form-group">
-              <label>Bujur (Lon):</label>
-              <input type="number" id="inpLon" value="110.3061" step="0.0001">
+              <label>Bujur / Lon (°):</label>
+              <input type="number" id="inpLon" value="110.3061" step="0.0001" placeholder="110.3061">
+              <span style="font-size: 0.68rem; color: #64748b;">BT: plus (+), BB: minus (-)</span>
             </div>
             <div class="form-group">
               <label>Tinggi (mdpl):</label>
-              <input type="number" id="inpAlt" value="45.0" step="1">
+              <input type="number" id="inpAlt" value="45.0" step="1" placeholder="45">
+              <span style="font-size: 0.68rem; color: #64748b;">Meter dpl (Ketinggian alat)</span>
             </div>
           </div>
 
@@ -523,7 +519,7 @@ HTML_TEMPLATE = """
           <div style="font-size: 2.8rem; margin-bottom: 12px;">🔭 ⛰️ 📈</div>
           <h3 style="color: #38bdf8; font-size: 1.15rem; margin-bottom: 8px;">Workspace Pemetaan Profil Ufuk Mar'i</h3>
           <p style="color: #94a3b8; font-size: 0.85rem; max-width: 540px; margin: 0 auto 16px auto; line-height: 1.5;">
-            Silakan muat berkas citra ufuk, gunakan kamera/webcam, atau pilih contoh lanskap senja di panel kiri, lalu klik <b>PROSES EKSTRAKSI KONTUR UFUK</b>.
+            Silakan muat berkas citra ufuk atau aktifkan kamera/webcam laptop di panel kiri, tentukan koordinat lokasi, lalu klik <b>PROSES EKSTRAKSI KONTUR UFUK</b>.
           </p>
           <div class="placeholder-features">
             <div class="pf-item">
@@ -539,8 +535,8 @@ HTML_TEMPLATE = """
               <div><b>Penerbitan Dokumen Resmi</b><p>Evaluasi kelayakan tempat rukyatul hilal & pencetakan Berita Acara format PDF</p></div>
             </div>
           </div>
-          <button type="button" class="btn btn-primary" style="max-width: 260px; margin: 20px auto 0 auto;" onclick="loadSamplePhoto()">
-            🌄 Muat Contoh Lanskap Cepat
+          <button type="button" class="btn btn-primary" style="max-width: 260px; margin: 20px auto 0 auto;" onclick="document.getElementById('galleryInput').click()">
+            📁 Pilih Berkas Citra Ufuk
           </button>
         </div>
 
