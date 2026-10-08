@@ -31,13 +31,13 @@ def main():
 
     app = QApplication(sys.argv)
     app.setApplicationName("PemetaanProfilUfukMari")
-    app.setApplicationDisplayName("Aplikasi Pemetaan Profil Ufuk Mar'i Berbasis Computer Vision")
 
     icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "icon.png")
     if os.path.exists(icon_path):
         app.setWindowIcon(QIcon(icon_path))
 
     window = MainWindow()
+    window.setWindowTitle("APLIKASI PEMETAAN PROFIL UFUK MAR'I (LAPTOP EDITION)")
     if os.path.exists(icon_path):
         window.setWindowIcon(QIcon(icon_path))
     window.show()

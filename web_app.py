@@ -40,15 +40,82 @@ HTML_TEMPLATE = """
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Pemetaan Ufuk Mar'i - Falak Digital</title>
+  <title>Pemetaan Ufuk Mar'i - Laptop Edition</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
     body { background-color: #0b0f17; color: #e2e8f0; padding-bottom: 60px; -webkit-font-smoothing: antialiased; }
-    .header { background: linear-gradient(135deg, #0f172a, #1e293b); padding: 16px 14px; border-bottom: 1px solid #334155; text-align: center; }
-    .header h1 { font-size: 1.15rem; color: #38bdf8; font-weight: 800; letter-spacing: 0.5px; }
-    .header p { font-size: 0.76rem; color: #94a3b8; margin-top: 3px; }
-    .container { max-width: 700px; margin: 0 auto; padding: 14px; }
-    .card { background-color: #131b2a; border: 1px solid #233147; border-radius: 14px; padding: 16px; margin-bottom: 14px; }
+    
+    /* Header Bar Responsif */
+    .header {
+      background: linear-gradient(135deg, #0f172a, #1e293b);
+      padding: 16px 20px;
+      border-bottom: 1px solid #334155;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      text-align: center;
+    }
+    .header-brand {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+    }
+    .header-brand h1 {
+      font-size: 1.25rem;
+      color: #38bdf8;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+    }
+    .header-brand p {
+      font-size: 0.78rem;
+      color: #94a3b8;
+      margin-top: 2px;
+    }
+    .header-meta {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .clock-badge {
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 4px 10px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.78rem;
+    }
+    .clock-label { color: #64748b; font-weight: 600; font-size: 0.7rem; }
+    .clock-val { color: #38bdf8; font-family: monospace; font-weight: bold; }
+    .badge-laptop {
+      background: rgba(56, 189, 248, 0.15);
+      color: #38bdf8;
+      border: 1px solid #0284c7;
+      padding: 4px 10px;
+      border-radius: 8px;
+      font-size: 0.75rem;
+      font-weight: 700;
+    }
+
+    /* Container & Grid Tata Letak Laptop */
+    .container {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 14px;
+    }
+    .dashboard-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .dash-col-left { display: flex; flex-direction: column; gap: 14px; }
+    .dash-col-right { display: flex; flex-direction: column; gap: 14px; }
+
+    .card { background-color: #131b2a; border: 1px solid #233147; border-radius: 14px; padding: 16px; margin-bottom: 0; }
     .card-title { font-size: 0.94rem; font-weight: 700; color: #38bdf8; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; }
     .form-group { margin-bottom: 12px; }
     label { display: block; font-size: 0.78rem; color: #94a3b8; margin-bottom: 5px; font-weight: 600; }
@@ -66,8 +133,11 @@ HTML_TEMPLATE = """
       font-weight: 700; cursor: pointer; text-align: center; text-decoration: none; transition: 0.15s;
     }
     .btn-primary { background: linear-gradient(135deg, #0284c7, #0369a1); color: #ffffff; }
+    .btn-primary:hover { background: linear-gradient(135deg, #0369a1, #0284c7); }
     .btn-success { background: linear-gradient(135deg, #10b981, #059669); color: #ffffff; }
+    .btn-success:hover { background: linear-gradient(135deg, #059669, #10b981); }
     .btn-secondary { background-color: #1e293b; color: #94a3b8; border: 1px solid #334155; }
+    .btn-secondary:hover { background-color: #334155; color: #ffffff; }
     .btn-sm { padding: 8px 10px; font-size: 0.8rem; border-radius: 8px; width: 100%; }
     .photo-area {
       border: 2px dashed #334155; border-radius: 12px; padding: 18px 14px; text-align: center;
@@ -78,9 +148,67 @@ HTML_TEMPLATE = """
       display: inline-block; padding: 4px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: bold;
     }
     .badge-success { background-color: #064e3b; color: #34d399; border: 1px solid #059669; }
-    .stat-card { background-color: #1a2436; border: 1px solid #28374d; border-radius: 10px; padding: 10px; text-align: center; }
+    .badge-info { background-color: #0c4a6e; color: #38bdf8; border: 1px solid #0284c7; }
+    .badge-accent { background-color: #1e1b4b; color: #a5b4fc; border: 1px solid #4338ca; }
+
+    /* Dual visual layout */
+    .dual-visual-wrapper {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      margin-bottom: 14px;
+    }
+    .visual-card { padding: 14px; }
+    .img-wrapper {
+      position: relative;
+      background: #000;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid #334155;
+    }
+    .result-img {
+      width: 100%;
+      height: auto;
+      display: block;
+      object-fit: contain;
+      max-height: 380px;
+    }
+
+    /* Stats Cards */
+    .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .stat-card { background-color: #1a2436; border: 1px solid #28374d; border-radius: 10px; padding: 10px 12px; text-align: center; }
     .stat-val { font-size: 1.15rem; font-weight: 800; color: #38bdf8; margin-top: 4px; }
     .stat-lbl { font-size: 0.72rem; color: #94a3b8; }
+    .stat-sub { font-size: 0.68rem; color: #64748b; margin-top: 2px; }
+
+    /* Placeholder Workspace */
+    .placeholder-card {
+      border: 2px dashed #233147;
+      background: radial-gradient(circle at 50% 30%, #151e30, #0c121e);
+      padding: 36px 20px;
+      text-align: center;
+    }
+    .placeholder-features {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      max-width: 500px;
+      margin: 16px auto;
+      text-align: left;
+    }
+    .pf-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      background: rgba(15, 23, 42, 0.6);
+      padding: 10px 14px;
+      border-radius: 8px;
+      border: 1px solid #1e293b;
+    }
+    .pf-icon { font-size: 1.2rem; }
+    .pf-item b { font-size: 0.84rem; color: #38bdf8; display: block; margin-bottom: 2px; }
+    .pf-item p { font-size: 0.74rem; color: #94a3b8; margin: 0; }
+
     #loading { display: none; text-align: center; padding: 20px 0; color: #38bdf8; font-weight: 700; }
     .spinner {
       border: 4px solid rgba(56, 189, 248, 0.2); border-top: 4px solid #38bdf8; border-radius: 50%;
@@ -157,7 +285,7 @@ HTML_TEMPLATE = """
     .preview-doc-header {
       background: linear-gradient(135deg, #0f172a, #1e293b);
       border-bottom: 1px solid #334155;
-      padding: 10px 14px;
+      padding: 10px 16px;
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -221,197 +349,323 @@ HTML_TEMPLATE = """
       padding: 6px;
       border-top: 1px solid #1e293b;
     }
+
+    /* Media Query Khusus Layar Laptop & Desktop (Lebar >= 992px) */
+    @media (min-width: 992px) {
+      .container {
+        max-width: 1440px;
+        padding: 20px 24px;
+      }
+      .header {
+        flex-direction: row;
+        justify-content: space-between;
+        align-items: center;
+        padding: 16px 32px;
+        text-align: left;
+      }
+      .header-brand {
+        justify-content: flex-start;
+      }
+      .header-meta {
+        justify-content: flex-end;
+      }
+      .dashboard-grid {
+        display: grid;
+        grid-template-columns: 420px 1fr;
+        gap: 20px;
+        align-items: start;
+      }
+      .dual-visual-wrapper {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+      }
+      .stats-grid {
+        grid-template-columns: repeat(4, 1fr);
+        gap: 12px;
+      }
+      .grid-4 {
+        grid-template-columns: 1fr 1fr;
+      }
+      .result-img {
+        max-height: 340px;
+      }
+    }
   </style>
 </head>
 <body>
 
   <div class="header">
-    <h1>🔭 PEMETAAN UFUK MAR'I</h1>
-    <p>Aplikasi Falak Digital & Deteksi Halangan Rukyat (Web Mobile)</p>
+    <div class="header-brand">
+      <div style="font-size: 1.8rem;">🔭</div>
+      <div>
+        <h1>PEMETAAN PROFIL UFUK MAR'I</h1>
+        <p>Instrumen Falak Digital & Deteksi Halangan Rukyat (Edisi Laptop & Desktop)</p>
+      </div>
+    </div>
+    <div class="header-meta">
+      <div class="clock-badge">
+        <span class="clock-label">WIB (UTC+7)</span>
+        <span class="clock-val" id="clockWib">--:--:--</span>
+      </div>
+      <div class="clock-badge">
+        <span class="clock-label">UTC</span>
+        <span class="clock-val" id="clockUtc">--:--:--</span>
+      </div>
+      <span class="badge badge-laptop">🖥️ Mode Laptop</span>
+    </div>
   </div>
 
   <div class="container">
+    <div class="dashboard-grid">
 
-    <!-- KARTU 1: PENGAMBILAN CITRA & KAMERA HP -->
-    <div class="card">
-      <div class="card-title">
-        <span>📸 1. Jepret / Muat Foto Ufuk</span>
-      </div>
-
-      <div class="grid-4">
-        <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('galleryInput').click()">
-          🖼️ Buka Galeri HP
-        </button>
-        <button type="button" class="btn btn-primary btn-sm" onclick="startLiveCamera()">
-          📹 Kamera Live (Garis Ufuk)
-        </button>
-        <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('cameraInput').click()">
-          📸 Jepret Kamera HP
-        </button>
-        <button type="button" class="btn btn-secondary btn-sm" onclick="loadSamplePhoto()">
-          🌄 Pakai Contoh
-        </button>
-      </div>
-
-      <input type="file" id="galleryInput" accept="image/*" style="display: none;" onchange="onFileSelected(this)">
-      <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display: none;" onchange="onFileSelected(this)">
-
-      <div id="liveCamWrapper">
-        <video id="cameraVideo" playsinline autoplay muted></video>
-        <canvas id="cameraOverlay"></canvas>
-        <div class="cam-controls">
-          <button type="button" class="btn-shutter" onclick="captureLiveFrame()">
-            📸 JEPRET FOTO
-          </button>
-          <button type="button" class="btn-close-cam" onclick="stopLiveCamera()">
-            ✖️ Tutup Kamera
-          </button>
-        </div>
-      </div>
-
-      <div class="photo-area" id="dropArea">
-        <p style="font-size: 1.8rem; margin-bottom: 4px;">🏞️</p>
-        <p style="font-weight: 700; color: #38bdf8; font-size: 0.88rem;" id="lblPhotoStatus">Belum ada foto yang dipilih</p>
-        <p style="font-size: 0.74rem; color: #64748b; margin-top: 3px;">Pilih via Galeri HP atau gunakan Kamera Live di atas</p>
-      </div>
-
-      <img id="rawPreview" class="preview-img" alt="Preview Foto Aktif">
-    </div>
-
-    <!-- KARTU 2: PARAMETER BIDIKAN & SENSOR HP -->
-    <div class="card">
-      <div class="card-title">
-        <span>🧭 2. Parameter Sensor & Bidikan</span>
-        <button type="button" class="btn btn-secondary btn-sm" style="width: auto;" onclick="getGPS()">📍 Ambil GPS HP</button>
-      </div>
-
-      <div class="grid-2">
-        <div class="form-group">
-          <label>Azimuth Bidikan (0 - 360°):</label>
-          <div style="display: flex; gap: 6px;">
-            <input type="number" id="inpAzimuth" value="270.0" step="0.1">
-            <button type="button" class="btn btn-secondary btn-sm" style="width: auto; white-space: nowrap;" onclick="document.getElementById('inpAzimuth').value='270.0'">270° Barat</button>
+      <!-- PANEL KIRI: INPUT CITRA & SENSOR -->
+      <div class="dash-col-left">
+        <!-- KARTU 1: PENGAMBILAN CITRA & KAMERA -->
+        <div class="card">
+          <div class="card-title">
+            <span>📸 1. Jepret / Muat Foto Ufuk</span>
+            <span class="badge badge-info" id="statusBadgeInput">Siap</span>
           </div>
-        </div>
-        <div class="form-group">
-          <label>Kemiringan / Tilt (°):</label>
-          <input type="number" id="inpTilt" value="0.0" step="0.1">
-        </div>
-      </div>
 
-      <div class="grid-3">
-        <div class="form-group">
-          <label>Lintang (Lat):</label>
-          <input type="number" id="inpLat" value="-7.9800" step="0.0001">
-        </div>
-        <div class="form-group">
-          <label>Bujur (Lon):</label>
-          <input type="number" id="inpLon" value="110.3061" step="0.0001">
-        </div>
-        <div class="form-group">
-          <label>Tinggi (mdpl):</label>
-          <input type="number" id="inpAlt" value="45.0" step="1">
-        </div>
-      </div>
-
-      <button type="button" id="btnProcess" class="btn btn-primary" onclick="processImage()" style="margin-top: 6px;">
-        🚀 PROSES EKSTRAKSI KONTUR UFUK
-      </button>
-    </div>
-
-    <div id="loading">
-      <div class="spinner"></div>
-      <p id="loadingText">Sedang mengekstrak profil ufuk mar'i dengan Computer Vision...</p>
-    </div>
-
-    <!-- KARTU 3: HASIL OLAH & KURVA PROFIL -->
-    <div id="resultSection" style="display: none;">
-      
-      <div class="card">
-        <div class="card-title">
-          <span>⛰️ 3. Citra Hasil Kontur Ufuk Mar'i</span>
-          <span id="resBadge" class="badge badge-success">Analisis Selesai</span>
-        </div>
-        <img id="resOverlayImg" style="width: 100%; border-radius: 8px; border: 1px solid #334155;" alt="Hasil Kontur">
-      </div>
-
-      <div class="card">
-        <div class="card-title">
-          <span>📈 4. Kurva Profil Elevasi vs Azimuth</span>
-        </div>
-        <img id="resPlotImg" style="width: 100%; border-radius: 8px; border: 1px solid #334155;" alt="Grafik Profil">
-        
-        <div class="slider-container">
-          <label>Inspeksi Titik Azimut Sasaran Hilal: <b id="lblSliderAz" style="color: #38bdf8;">270.00°</b></label>
-          <input type="range" id="sliderAz" min="262.5" max="277.5" step="0.05" value="270.0" oninput="onSliderTargetChanged(this.value)">
-        </div>
-
-        <div class="grid-3">
-          <div class="stat-card">
-            <div class="stat-lbl">Tinggi Halangan</div>
-            <div class="stat-val" id="resTargetAlt">+0.14°</div>
+          <div class="grid-4">
+            <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('galleryInput').click()">
+              📁 Buka File / Foto
+            </button>
+            <button type="button" class="btn btn-primary btn-sm" onclick="startLiveCamera()">
+              📹 Kamera / Webcam
+            </button>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('cameraInput').click()">
+              📸 Jepret Foto
+            </button>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="loadSamplePhoto()">
+              🌄 Contoh Lanskap
+            </button>
           </div>
-          <div class="stat-card">
-            <div class="stat-lbl">Ufuk Laut (Dip)</div>
-            <div class="stat-val" id="resDip">-0.20°</div>
+
+          <input type="file" id="galleryInput" accept="image/*" style="display: none;" onchange="onFileSelected(this)">
+          <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display: none;" onchange="onFileSelected(this)">
+
+          <div id="liveCamWrapper">
+            <video id="cameraVideo" playsinline autoplay muted></video>
+            <canvas id="cameraOverlay"></canvas>
+            <div class="cam-controls">
+              <button type="button" class="btn-shutter" onclick="captureLiveFrame()">
+                📸 JEPRET FOTO
+              </button>
+              <button type="button" class="btn-close-cam" onclick="stopLiveCamera()">
+                ✖️ Tutup Kamera
+              </button>
+            </div>
           </div>
-          <div class="stat-card">
-            <div class="stat-lbl">Status Rukyat</div>
-            <div class="stat-val" id="resStatusTxt" style="font-size: 0.92rem; color: #34d399;">Cukup Layak</div>
+
+          <div class="photo-area" id="dropArea">
+            <p style="font-size: 1.8rem; margin-bottom: 4px;">🏞️</p>
+            <p style="font-weight: 700; color: #38bdf8; font-size: 0.88rem;" id="lblPhotoStatus">Belum ada foto yang dipilih</p>
+            <p style="font-size: 0.74rem; color: #64748b; margin-top: 3px;">Pilih berkas foto atau gunakan kamera/webcam di atas</p>
           </div>
+
+          <img id="rawPreview" class="preview-img" alt="Preview Foto Aktif">
         </div>
 
-        <div style="background-color: #0f172a; padding: 12px; border-radius: 8px; margin-top: 12px; font-size: 0.8rem; line-height: 1.4; color: #cbd5e1;">
-          <p id="resDescText">Memuat deskripsi kelayakan...</p>
-        </div>
-      </div>
-
-      <!-- KARTU 4: FORM EVALUASI LAPANGAN & PENERBITAN LAPORAN PDF -->
-      <div class="card" id="evalCard" style="border: 1px solid #0284c7;">
-        <div class="card-title" style="border-bottom: 1px solid #233147; padding-bottom: 8px;">
-          <span>📋 EVALUASI LAPANGAN & PENERBITAN LAPORAN PDF</span>
-          <button type="button" class="btn btn-secondary btn-sm" style="width: auto; padding: 4px 10px; font-size: 0.75rem;" onclick="document.getElementById('resultSection').scrollIntoView({behavior: 'smooth'})">
-            ⬅️ Kembali ke Hasil
-          </button>
-        </div>
-
-        <div class="form-group">
-          <label>Nama Lokasi / Pos Observasi Falak:</label>
-          <input type="text" id="editLocation" value="Pos Observasi Falak Lapangan">
-        </div>
-
-        <div class="form-group">
-          <label>Petugas Pengamat / Tim Falak:</label>
-          <input type="text" id="editObserver" value="Tim Falak & Astronomi">
-        </div>
-
-        <div class="form-group">
-          <label>Deskripsi Hasil Analisis Ufuk:</label>
-          <textarea id="textDesc" rows="3" placeholder="Deskripsi otomatis terisi saat proses analisa selesai..."></textarea>
-        </div>
-
-        <div class="form-group">
-          <label>Rekomendasi Kelayakan Tempat Rukyatul Hilal:</label>
-          <textarea id="textRec" rows="3" placeholder="Rekomendasi kelayakan tempat terisi otomatis..."></textarea>
-        </div>
-
-        <div style="background: #0f172a; border: 1px solid #1e293b; border-radius: 10px; padding: 14px; margin-top: 14px;">
-          <p style="color: #38bdf8; font-size: 0.78rem; font-weight: bold; margin-bottom: 10px; letter-spacing: 0.5px;">
-            AKSI PENERBITAN BERKAS & DOKUMEN
-          </p>
-
-          <button type="button" class="btn btn-success" onclick="openReportPreview()" style="margin-bottom: 10px; padding: 14px; font-size: 0.95rem;">
-            🖨️ CETAK / PREVIEW LAPORAN RESMI (PDF BERITA ACARA)
-          </button>
+        <!-- KARTU 2: PARAMETER BIDIKAN & SENSOR -->
+        <div class="card">
+          <div class="card-title">
+            <span>🧭 2. Parameter Sensor & Bidikan</span>
+            <button type="button" class="btn btn-secondary btn-sm" style="width: auto;" onclick="getGPS()">📍 Ambil GPS</button>
+          </div>
 
           <div class="grid-2">
-            <button type="button" class="btn btn-secondary btn-sm" onclick="downloadCsv()">
-              📄 Ekspor Data Numerik (CSV)
-            </button>
-            <button type="button" class="btn btn-primary btn-sm" onclick="resetObservation()">
-              🚀 Mulai Pengamatan Baru
-            </button>
+            <div class="form-group">
+              <label>Azimuth Bidikan (0 - 360°):</label>
+              <div style="display: flex; gap: 6px;">
+                <input type="number" id="inpAzimuth" value="270.0" step="0.1">
+                <button type="button" class="btn btn-secondary btn-sm" style="width: auto; white-space: nowrap;" onclick="document.getElementById('inpAzimuth').value='270.0'">270° Barat</button>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Kemiringan / Tilt (°):</label>
+              <input type="number" id="inpTilt" value="0.0" step="0.1">
+            </div>
           </div>
+
+          <div class="grid-3">
+            <div class="form-group">
+              <label>Lintang (Lat):</label>
+              <input type="number" id="inpLat" value="-7.9800" step="0.0001">
+            </div>
+            <div class="form-group">
+              <label>Bujur (Lon):</label>
+              <input type="number" id="inpLon" value="110.3061" step="0.0001">
+            </div>
+            <div class="form-group">
+              <label>Tinggi (mdpl):</label>
+              <input type="number" id="inpAlt" value="45.0" step="1">
+            </div>
+          </div>
+
+          <button type="button" id="btnProcess" class="btn btn-primary" onclick="processImage()" style="margin-top: 6px;">
+            🚀 PROSES EKSTRAKSI KONTUR UFUK
+          </button>
+        </div>
+
+        <div id="loading">
+          <div class="spinner"></div>
+          <p id="loadingText">Sedang mengekstrak profil ufuk mar'i dengan Computer Vision...</p>
+        </div>
+      </div>
+
+      <!-- PANEL KANAN: HASIL ANALISIS & WORKSPACE LAPTOP -->
+      <div class="dash-col-right">
+
+        <!-- WORKSPACE PLACEHOLDER SAAT BELUM PROSES -->
+        <div id="rightPlaceholder" class="card placeholder-card">
+          <div style="font-size: 2.8rem; margin-bottom: 12px;">🔭 ⛰️ 📈</div>
+          <h3 style="color: #38bdf8; font-size: 1.15rem; margin-bottom: 8px;">Workspace Pemetaan Profil Ufuk Mar'i</h3>
+          <p style="color: #94a3b8; font-size: 0.85rem; max-width: 540px; margin: 0 auto 16px auto; line-height: 1.5;">
+            Silakan muat berkas citra ufuk, gunakan kamera/webcam, atau pilih contoh lanskap senja di panel kiri, lalu klik <b>PROSES EKSTRAKSI KONTUR UFUK</b>.
+          </p>
+          <div class="placeholder-features">
+            <div class="pf-item">
+              <span class="pf-icon">⚡</span>
+              <div><b>Segmentasi Kontur Otomatis</b><p>Deteksi perbatasan langit-daratan berbasis Computer Vision OpenCV</p></div>
+            </div>
+            <div class="pf-item">
+              <span class="pf-icon">📐</span>
+              <div><b>Kurva Elevasi vs Azimut Sinkron</b><p>Pemetaan Ufuk Mar'i, Ufuk Hakiki (0.00°), Dip Laut, dan Kriteria MABIMS (+3.00°)</p></div>
+            </div>
+            <div class="pf-item">
+              <span class="pf-icon">📑</span>
+              <div><b>Penerbitan Dokumen Resmi</b><p>Evaluasi kelayakan tempat rukyatul hilal & pencetakan Berita Acara format PDF</p></div>
+            </div>
+          </div>
+          <button type="button" class="btn btn-primary" style="max-width: 260px; margin: 20px auto 0 auto;" onclick="loadSamplePhoto()">
+            🌄 Muat Contoh Lanskap Cepat
+          </button>
+        </div>
+
+        <!-- HASIL OLAH & KURVA PROFIL -->
+        <div id="resultSection" style="display: none;">
+          
+          <!-- DUAL VISUAL SECTION (SIDE-BY-SIDE ON LAPTOP) -->
+          <div class="dual-visual-wrapper">
+            <div class="card visual-card">
+              <div class="card-title">
+                <span>⛰️ 3. Citra Hasil Kontur Ufuk Mar'i</span>
+                <span id="resBadge" class="badge badge-success">Analisis Selesai</span>
+              </div>
+              <div class="img-wrapper">
+                <img id="resOverlayImg" class="result-img" alt="Hasil Kontur">
+              </div>
+            </div>
+
+            <div class="card visual-card">
+              <div class="card-title">
+                <span>📈 4. Kurva Profil Elevasi vs Azimuth</span>
+                <span class="badge badge-accent">Fast OpenCV Vector</span>
+              </div>
+              <div class="img-wrapper">
+                <img id="resPlotImg" class="result-img" alt="Grafik Profil">
+              </div>
+            </div>
+          </div>
+
+          <!-- KARTU INSPEKSI AZIMUT & STATISTIK FALAK -->
+          <div class="card" style="margin-bottom: 14px;">
+            <div class="card-title">
+              <span>🎯 Inspeksi Azimut Sasaran Hilal</span>
+              <span style="font-size: 0.8rem; color: #94a3b8;">Scrubbing instan 0 ms</span>
+            </div>
+
+            <div class="slider-container">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                <label style="margin: 0; font-size: 0.82rem;">Titik Azimut Sasaran:</label>
+                <b id="lblSliderAz" style="color: #38bdf8; font-size: 1.05rem; background: #0f172a; padding: 2px 10px; border-radius: 6px; border: 1px solid #334155;">270.00°</b>
+              </div>
+              <input type="range" id="sliderAz" min="262.5" max="277.5" step="0.05" value="270.0" oninput="onSliderTargetChanged(this.value)">
+              <div style="display: flex; justify-content: space-between; font-size: 0.72rem; color: #64748b; margin-top: 4px;">
+                <span id="lblMinAz">262.5°</span>
+                <span>Tengah (Barat)</span>
+                <span id="lblMaxAz">277.5°</span>
+              </div>
+            </div>
+
+            <div class="stats-grid">
+              <div class="stat-card">
+                <div class="stat-lbl">Tinggi Halangan Mar'i</div>
+                <div class="stat-val" id="resTargetAlt">+0.14°</div>
+                <div class="stat-sub" id="resTargetAltDms">00° 08' 24"</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-lbl">Ufuk Laut (Dip)</div>
+                <div class="stat-val" id="resDip">-0.20°</div>
+                <div class="stat-sub" id="resDipDms">-00° 11' 50"</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-lbl">Selisih Hakiki (Δ0°)</div>
+                <div class="stat-val" id="resDeltaHakiki">+0.14°</div>
+                <div class="stat-sub">Relatif Ufuk 0.00°</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-lbl">Status Rukyatul Hilal</div>
+                <div class="stat-val" id="resStatusTxt" style="font-size: 0.92rem; color: #34d399;">Cukup Layak</div>
+                <div class="stat-sub" id="resCategoryTxt">Ufuk Terbuka</div>
+              </div>
+            </div>
+
+            <div style="background-color: #0f172a; padding: 12px 14px; border-radius: 8px; margin-top: 12px; font-size: 0.82rem; line-height: 1.5; color: #cbd5e1; border-left: 3px solid #38bdf8;">
+              <p id="resDescText">Memuat deskripsi kelayakan...</p>
+            </div>
+          </div>
+
+          <!-- KARTU 4: FORM EVALUASI LAPANGAN & PENERBITAN LAPORAN PDF -->
+          <div class="card" id="evalCard" style="border: 1px solid #0284c7;">
+            <div class="card-title" style="border-bottom: 1px solid #233147; padding-bottom: 8px;">
+              <span>📋 EVALUASI LAPANGAN & PENERBITAN DOKUMEN RESMI</span>
+            </div>
+
+            <div class="grid-2">
+              <div class="form-group">
+                <label>Nama Lokasi / Pos Observasi Falak:</label>
+                <input type="text" id="editLocation" value="Pos Observasi Falak (Laptop)">
+              </div>
+              <div class="form-group">
+                <label>Petugas Pengamat / Tim Falak:</label>
+                <input type="text" id="editObserver" value="Tim Falak & Astronomi">
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label>Deskripsi Hasil Analisis Ufuk:</label>
+              <textarea id="textDesc" rows="3" placeholder="Deskripsi otomatis terisi saat proses analisa selesai..."></textarea>
+            </div>
+
+            <div class="form-group">
+              <label>Rekomendasi Kelayakan Tempat Rukyatul Hilal:</label>
+              <textarea id="textRec" rows="3" placeholder="Rekomendasi kelayakan tempat terisi otomatis..."></textarea>
+            </div>
+
+            <div style="background: #0f172a; border: 1px solid #1e293b; border-radius: 10px; padding: 14px; margin-top: 14px;">
+              <p style="color: #38bdf8; font-size: 0.78rem; font-weight: bold; margin-bottom: 10px; letter-spacing: 0.5px;">
+                AKSI PENERBITAN BERKAS & DOKUMEN
+              </p>
+
+              <button type="button" class="btn btn-success" onclick="openReportPreview()" style="margin-bottom: 10px; padding: 14px; font-size: 0.95rem;">
+                🖨️ CETAK / PREVIEW LAPORAN RESMI (PDF BERITA ACARA)
+              </button>
+
+              <div class="grid-2">
+                <button type="button" class="btn btn-secondary btn-sm" onclick="downloadCsv()">
+                  📄 Ekspor Data Numerik (CSV)
+                </button>
+                <button type="button" class="btn btn-primary btn-sm" onclick="resetObservation()">
+                  🚀 Mulai Pengamatan Baru
+                </button>
+              </div>
+            </div>
+
+          </div>
+
         </div>
 
       </div>
@@ -459,6 +713,31 @@ HTML_TEMPLATE = """
     let lastHudDrawTime = 0;
     let clientProfileCurve = null;
 
+    // Jam Falak Presisi (WIB UTC+7 & UTC)
+    function updateClocks() {
+      const now = new Date();
+      const utcStr = now.toISOString().substr(11, 8);
+      const wibTime = new Date(now.getTime() + (7 * 3600 * 1000));
+      const wibStr = wibTime.toISOString().substr(11, 8);
+      const elWib = document.getElementById('clockWib');
+      const elUtc = document.getElementById('clockUtc');
+      if (elWib) elWib.innerText = wibStr;
+      if (elUtc) elUtc.innerText = utcStr;
+    }
+    setInterval(updateClocks, 1000);
+    updateClocks();
+
+    // Konversi Sudut ke Sexagesimal DMS (+DD° MM' SS.SS")
+    function formatDms(deg) {
+      const sign = deg < 0 ? "-" : "+";
+      const abs = Math.abs(deg);
+      const d = Math.floor(abs);
+      const remMin = (abs - d) * 60;
+      const m = Math.floor(remMin);
+      const s = ((remMin - m) * 60).toFixed(1);
+      return sign + String(d).padStart(2, '0') + "° " + String(m).padStart(2, '0') + "' " + String(s).padStart(4, '0') + '"';
+    }
+
     // Tampilkan foto langsung ke preview saat dipilih, dan kompresi latar belakang
     function compressAndSetImage(file, statusText) {
       const reader = new FileReader();
@@ -496,7 +775,7 @@ HTML_TEMPLATE = """
 
     function onFileSelected(input) {
       if (input.files && input.files[0]) {
-        const sourceName = input.id === 'galleryInput' ? 'Galeri HP' : 'Kamera HP';
+        const sourceName = input.id === 'galleryInput' ? 'Penyimpanan Berkas' : 'Kamera / Webcam';
         compressAndSetImage(input.files[0], "Foto siap dari " + sourceName);
         input.value = "";
       }
@@ -675,7 +954,7 @@ HTML_TEMPLATE = """
           if (pos.coords.altitude) {
             document.getElementById('inpAlt').value = Math.round(pos.coords.altitude);
           }
-          alert("Lokasi GPS HP berhasil disinkronkan!");
+          alert("Lokasi GPS berhasil disinkronkan!");
         },
         err => {
           alert("Gagal membaca GPS: " + err.message + ". Silakan isi secara manual.");
@@ -733,9 +1012,14 @@ HTML_TEMPLATE = """
         slider.max = data.az_max.toFixed(2);
         slider.value = payload.azimuth.toFixed(2);
         document.getElementById('lblSliderAz').innerText = payload.azimuth.toFixed(2) + "°";
+        if (document.getElementById('lblMinAz')) document.getElementById('lblMinAz').innerText = data.az_min.toFixed(1) + "°";
+        if (document.getElementById('lblMaxAz')) document.getElementById('lblMaxAz').innerText = data.az_max.toFixed(1) + "°";
 
         updateTargetDisplay(payload.azimuth, data.target_analysis);
 
+        if (document.getElementById('rightPlaceholder')) {
+          document.getElementById('rightPlaceholder').style.display = 'none';
+        }
         document.getElementById('resultSection').style.display = 'block';
         document.getElementById('resultSection').scrollIntoView({ behavior: 'smooth' });
       })
@@ -809,9 +1093,23 @@ HTML_TEMPLATE = """
     function updateTargetDisplay(targetAz, analysis) {
       const altStr = (analysis.target_alt >= 0 ? "+" : "") + analysis.target_alt.toFixed(2) + "°";
       document.getElementById('resTargetAlt').innerText = altStr;
-      document.getElementById('resDip').innerText = "-" + (analysis.dip_deg || 0.20).toFixed(2) + "°";
+      if (document.getElementById('resTargetAltDms')) {
+        document.getElementById('resTargetAltDms').innerText = formatDms(analysis.target_alt);
+      }
+      const dipVal = analysis.dip_deg || 0.20;
+      document.getElementById('resDip').innerText = "-" + dipVal.toFixed(2) + "°";
+      if (document.getElementById('resDipDms')) {
+        document.getElementById('resDipDms').innerText = formatDms(-dipVal);
+      }
+      if (document.getElementById('resDeltaHakiki')) {
+        const delta = analysis.target_alt - 0.0;
+        document.getElementById('resDeltaHakiki').innerText = (delta >= 0 ? "+" : "") + delta.toFixed(2) + "°";
+      }
       document.getElementById('resStatusTxt').innerText = analysis.severity || analysis.status || "Layak";
       const cat = analysis.category || analysis.status || "Ufuk Terbuka";
+      if (document.getElementById('resCategoryTxt')) {
+        document.getElementById('resCategoryTxt').innerText = cat;
+      }
       
       const smartDesc = `Berdasarkan ekstraksi kontur computer vision pada azimut bidikan ${targetAz.toFixed(2)}°, diperoleh tinggi rintangan ufuk pada azimut sasaran ${targetAz.toFixed(2)}° sebesar ${altStr}. Kondisi ufuk: ${cat}.`;
       document.getElementById('resDescText').innerText = smartDesc;
@@ -946,6 +1244,9 @@ HTML_TEMPLATE = """
       selectedImageBase64 = null;
       document.getElementById('rawPreview').style.display = 'none';
       document.getElementById('resultSection').style.display = 'none';
+      if (document.getElementById('rightPlaceholder')) {
+        document.getElementById('rightPlaceholder').style.display = 'block';
+      }
       document.getElementById('lblPhotoStatus').innerText = "Belum ada foto yang dipilih";
       document.getElementById('lblPhotoStatus').style.color = "#94a3b8";
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1282,7 +1583,7 @@ def api_download_csv():
     export_csv_data(
         output_csv_path=csv_path,
         profile_data=LAST_ANALYSIS["profile_data"],
-        location_name="Pos Observasi Falak (Web Mobile)",
+        location_name="Pos Observasi Falak (Laptop)",
         az_center=LAST_ANALYSIS["azimuth"],
         dip_deg=LAST_ANALYSIS["profile_data"]["dip_deg"],
     )
@@ -1292,9 +1593,9 @@ def api_download_csv():
 
 def main():
     print("=" * 60)
-    print("   APLIKASI WEB PEMETAAN UFUK MAR'I (MOBILE & DESKTOP)")
+    print("   APLIKASI PEMETAAN UFUK MAR'I (EDISI LAPTOP & DESKTOP)")
     print("   Buka dari Browser Laptop : http://127.0.0.1:5000")
-    print("   Buka dari Browser HP     : Akses via Cloudflare Tunnel")
+    print("   Buka dari Jaringan Lokal : http://192.168.x.x:5000")
     print("=" * 60)
     app.run(host="0.0.0.0", port=5000, debug=False, threaded=True)
 
