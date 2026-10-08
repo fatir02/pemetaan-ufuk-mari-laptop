@@ -387,24 +387,38 @@ def export_csv_data(
     dip_deg: Optional[float] = None,
 ) -> str:
     """
-    Mengekspor data numerik profil ufuk (Azimuth, Elevation, Horizon_Y) ke file CSV.
+    Mengekspor data numerik profil ufuk (Azimuth, Elevation, Horizon_Y) ke file CSV
+    dalam format tabel yang rapi, informatif, dan mudah dibaca.
     """
     os.makedirs(os.path.dirname(os.path.abspath(output_csv_path)), exist_ok=True)
     azimuths = profile_data["azimuths"]
     elevations = profile_data["elevations"]
     horizon_y = profile_data["horizon_y"]
-    if dip_deg is None:
-        dip_deg = profile_data.get("dip_deg", 0.0)
+    dip_val = float(dip_deg) if dip_deg is not None else float(profile_data.get("dip_deg", 0.0))
 
     with open(output_csv_path, "w", encoding="utf-8") as f:
-        f.write("# INSTRUMEN PEMETAAN PROFIL UFUK MAR'I BERBASIS COMPUTER VISION\n")
-        f.write(f"# Lokasi: {location_name}\n")
-        f.write(f"# Azimut Bidikan Tengah: {az_center:.2f} deg\n")
-        f.write(f"# Kerendahan Ufuk (Dip): {dip_deg:.4f} deg\n")
-        f.write("# Tanggal Ekspor: " + time.strftime("%Y-%m-%d %H:%M:%S") + "\n")
-        f.write("Kolom_X,Azimut_deg,Elevasi_Halangan_deg,Pixel_Y,Bebas_Ufuk_Hakiki\n")
+        f.write("# ==========================================================================\n")
+        f.write("# TABEL DATA NUMERIK PROFIL UFUK MAR'I BERBASIS COMPUTER VISION\n")
+        f.write(f"# Pos Observasi Falak     : {location_name}\n")
+        f.write(f"# Azimut Bidikan Utama    : {az_center:.2f}° (Barat)\n")
+        f.write(f"# Kerendahan Ufuk Laut Dip: -{dip_val:.4f}°\n")
+        f.write(f"# Waktu Ekspor            : {time.strftime('%Y-%m-%d %H:%M:%S')} WIB\n")
+        f.write("# ==========================================================================\n")
+        f.write("No,Kolom_Pixel_X,Azimut_deg,Elevasi_Halangan_deg,Elevasi_DMS,Selisih_Hakiki_deg,Selisih_Dip_deg,Status_Rukyat\n")
         for x in range(len(azimuths)):
-            is_clear = "YA" if elevations[x] <= 0.0 else "TIDAK"
-            f.write(f"{x},{azimuths[x]:.4f},{elevations[x]:.4f},{horizon_y[x]},{is_clear}\n")
+            el = float(elevations[x])
+            az = float(azimuths[x])
+            dms = format_dms(el)
+            delta_hakiki = el - 0.0
+            delta_dip = el - (-dip_val)
+            if el <= -dip_val + 0.05:
+                status = "Sangat Terbuka"
+            elif el <= 0.0:
+                status = "Ufuk Rendah Terbuka"
+            elif el <= 1.2:
+                status = "Halangan Rendah (Aman)"
+            else:
+                status = "Halangan Tinggi (Waspada)"
+            f.write(f"{x + 1},{x},{az:.4f},{el:+.4f},\"{dms}\",{delta_hakiki:+.4f},{delta_dip:+.4f},{status}\n")
 
     return output_csv_path

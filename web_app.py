@@ -440,6 +440,28 @@ HTML_TEMPLATE = """
           <input type="file" id="galleryInput" accept="image/*" style="display: none;" onchange="onFileSelected(this)">
 
           <div id="liveCamWrapper">
+            <!-- Pilihan Sumber Perangkat Kamera -->
+            <div style="background: rgba(15, 23, 42, 0.95); padding: 8px 12px; display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; border-bottom: 1px solid #334155;">
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <span style="font-size: 0.78rem; color: #38bdf8; font-weight: bold;">📹 Sumber:</span>
+                <select id="cameraSourceSelect" onchange="onCameraDeviceSelected(this.value)" style="width: auto; max-width: 200px; padding: 4px 8px; font-size: 0.75rem; background: #1a2436; border: 1px solid #334155; border-radius: 6px; color: #ffffff;">
+                  <option value="">Deteksi Kamera...</option>
+                </select>
+              </div>
+              <button type="button" onclick="toggleHpCameraGuide()" style="background: none; border: none; color: #38bdf8; font-size: 0.74rem; cursor: pointer; text-decoration: underline;">
+                📲 Cara Hubungkan Kamera HP
+              </button>
+            </div>
+
+            <!-- Petunjuk Cepat Hubungkan HP -->
+            <div id="hpCamGuide" style="display: none; background: #0f172a; padding: 10px 14px; border-bottom: 1px solid #233147; font-size: 0.75rem; color: #cbd5e1; line-height: 1.5;">
+              <b style="color: #38bdf8; display: block; margin-bottom: 4px;">📲 Hubungkan Kamera HP ke Laptop (Webcam Sementara):</b>
+              <p>1. Unduh aplikasi <b>Iriun Webcam</b> atau <b>DroidCam</b> di HP & Laptop Anda.</p>
+              <p>2. Sambungkan HP ke Laptop via Wi-Fi yang sama atau kabel USB.</p>
+              <p>3. Kamera HP otomatis terdeteksi pada pilihan <b>Sumber</b> di atas!</p>
+              <p style="color: #64748b; margin-top: 4px;"><i>Nanti saat sudah memiliki alat teleskop / USB eyepiece camera khusus, cukup colok kabel USB ke laptop dan pilih dari dropdown yang sama.</i></p>
+            </div>
+
             <video id="cameraVideo" playsinline autoplay muted></video>
             <canvas id="cameraOverlay"></canvas>
             <div class="cam-controls">
@@ -651,8 +673,8 @@ HTML_TEMPLATE = """
               </button>
 
               <div class="grid-2">
-                <button type="button" class="btn btn-secondary btn-sm" onclick="downloadCsv()">
-                  📄 Ekspor Data Numerik (CSV)
+                <button type="button" class="btn btn-secondary btn-sm" onclick="openDataTableModal()">
+                  📊 Buka Tabel & Ekspor Data (CSV)
                 </button>
                 <button type="button" class="btn btn-primary btn-sm" onclick="resetObservation()">
                   🚀 Mulai Pengamatan Baru
@@ -668,6 +690,58 @@ HTML_TEMPLATE = """
 
     </div>
 
+  </div>
+
+  <!-- VIEWER TABEL DATA NUMERIK INTERAKTIF -->
+  <div id="dataTableModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(5, 8, 14, 0.96); z-index: 9999; flex-direction: column;">
+    <div class="preview-doc-header">
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <button type="button" class="doc-btn" onclick="closeDataTableModal()">⬅️ Kembali</button>
+        <h2>📊 TABEL DATA NUMERIK PROFIL UFUK MAR'I</h2>
+      </div>
+
+      <div class="doc-toolbar">
+        <label style="font-size: 0.76rem; color: #94a3b8; margin: 0 4px 0 0;">Kerapatan:</label>
+        <select id="selTableInterval" onchange="renderDataTable(this.value)" style="background: #1e293b; color: #38bdf8; border: 1px solid #334155; border-radius: 6px; padding: 6px 8px; font-size: 0.8rem; font-weight: bold; outline: none;">
+          <option value="0.5">Interval 0.50° (Rekomendasi Falak)</option>
+          <option value="0.25">Interval 0.25° (Detail)</option>
+          <option value="0.1">Interval 0.10° (Rapat)</option>
+          <option value="all">Semua Titik Sampel</option>
+        </select>
+        <button type="button" class="doc-btn" style="background: #059669; color: #fff;" onclick="downloadCsv()">📥 Unduh File CSV</button>
+        <button type="button" class="doc-btn" onclick="copyTableToClipboard()">📋 Salin Teks</button>
+      </div>
+    </div>
+
+    <!-- Ringkasan Statistik Tabel -->
+    <div style="background: #111726; padding: 8px 16px; border-bottom: 1px solid #1e293b; display: flex; gap: 16px; flex-wrap: wrap; font-size: 0.78rem;">
+      <span style="color: #94a3b8;">Total Baris: <b id="tblSampleCount" style="color: #38bdf8;">--</b></span>
+      <span style="color: #94a3b8;">Rentang Azimut: <b id="tblAzRange" style="color: #38bdf8;">--</b></span>
+      <span style="color: #94a3b8;">Ufuk Laut (Dip): <b id="tblDipVal" style="color: #38bdf8;">--</b></span>
+      <span style="color: #94a3b8;">Elevasi Min/Max: <b id="tblElevRange" style="color: #38bdf8;">--</b></span>
+    </div>
+
+    <!-- Area Tabel Scrollable -->
+    <div style="flex: 1; overflow: auto; padding: 14px 16px; background-color: #070a10;">
+      <div style="max-width: 1300px; margin: 0 auto; background: #131b2a; border: 1px solid #233147; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.5);">
+        <table id="numericTable" style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.82rem;">
+          <thead>
+            <tr style="background: #0f172a; color: #38bdf8; border-bottom: 2px solid #233147; position: sticky; top: 0; z-index: 2;">
+              <th style="padding: 10px 12px; font-weight: bold; border-right: 1px solid #1e293b;">No</th>
+              <th style="padding: 10px 12px; font-weight: bold; border-right: 1px solid #1e293b;">Azimut (°)</th>
+              <th style="padding: 10px 12px; font-weight: bold; border-right: 1px solid #1e293b;">Elevasi Mar'i (°)</th>
+              <th style="padding: 10px 12px; font-weight: bold; border-right: 1px solid #1e293b;">Format DMS Falak</th>
+              <th style="padding: 10px 12px; font-weight: bold; border-right: 1px solid #1e293b;">Selisih Hakiki (Δ0.00°)</th>
+              <th style="padding: 10px 12px; font-weight: bold; border-right: 1px solid #1e293b;">Selisih Dip (ΔLaut)</th>
+              <th style="padding: 10px 12px; font-weight: bold;">Status Rukyatul Hilal</th>
+            </tr>
+          </thead>
+          <tbody id="numericTableBody">
+            <!-- Diisi lewat JS -->
+          </tbody>
+        </table>
+      </div>
+    </div>
   </div>
 
   <!-- VIEWER DOKUMEN LAPORAN PDF INTERAKTIF -->
@@ -800,28 +874,83 @@ HTML_TEMPLATE = """
         });
     }
 
-    async function startLiveCamera() {
+    let currentCameraDeviceId = null;
+
+    function toggleHpCameraGuide() {
+      const guide = document.getElementById('hpCamGuide');
+      if (guide) {
+        guide.style.display = guide.style.display === 'none' ? 'block' : 'none';
+      }
+    }
+
+    async function updateCameraDeviceList() {
+      const sel = document.getElementById('cameraSourceSelect');
+      if (!sel || !navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return;
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoDevices = devices.filter(d => d.kind === 'videoinput');
+        if (videoDevices.length === 0) return;
+
+        sel.innerHTML = "";
+        videoDevices.forEach((dev, idx) => {
+          const opt = document.createElement('option');
+          opt.value = dev.deviceId;
+          let label = dev.label || `Kamera ${idx + 1}`;
+          if (/iriun/i.test(label)) label = "📱 " + label + " (Kamera HP)";
+          else if (/droid/i.test(label)) label = "📱 " + label + " (Kamera HP)";
+          else if (/camo|epoc/i.test(label)) label = "📱 " + label + " (Kamera HP)";
+          else if (/integrated|built-in/i.test(label)) label = "💻 " + label + " (Webcam Laptop)";
+          else if (/usb/i.test(label)) label = "🔭 " + label + " (USB/Teleskop)";
+          opt.text = label;
+          if (currentCameraDeviceId && dev.deviceId === currentCameraDeviceId) {
+            opt.selected = true;
+          }
+          sel.appendChild(opt);
+        });
+      } catch (e) {
+        console.warn("Gagal membaca daftar kamera:", e);
+      }
+    }
+
+    async function onCameraDeviceSelected(deviceId) {
+      if (!deviceId) return;
+      currentCameraDeviceId = deviceId;
+      if (cameraStream) {
+        cameraStream.getTracks().forEach(track => track.stop());
+        cameraStream = null;
+      }
+      await startLiveCamera(deviceId);
+    }
+
+    async function startLiveCamera(preferredDeviceId) {
       const wrapper = document.getElementById('liveCamWrapper');
       const video = document.getElementById('cameraVideo');
       wrapper.style.display = 'block';
 
       try {
-        const constraints = {
-          video: {
-            facingMode: { ideal: "environment" },
-            width: { ideal: 1280 },
-            height: { ideal: 720 }
-          },
-          audio: false
+        const targetId = preferredDeviceId || currentCameraDeviceId;
+        const videoConstraints = {
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
         };
-        cameraStream = await navigator.mediaDevices.getUserMedia(constraints);
+        if (targetId) {
+          videoConstraints.deviceId = { exact: targetId };
+        } else {
+          videoConstraints.facingMode = { ideal: "environment" };
+        }
+
+        cameraStream = await navigator.mediaDevices.getUserMedia({
+          video: videoConstraints,
+          audio: false
+        });
         video.srcObject = cameraStream;
         video.onloadedmetadata = () => {
           video.play();
           drawLiveHudLoop();
+          updateCameraDeviceList();
         };
       } catch (err) {
-        alert("Tidak dapat membuka kamera browser: " + err.message + ". Silakan gunakan tombol 'Jepret Kamera HP' sebagai alternatif.");
+        alert("Tidak dapat membuka kamera: " + err.message + ". Pastikan izin kamera browser diaktifkan atau aplikasi webcam (Iriun/DroidCam) sudah berjalan.");
         wrapper.style.display = 'none';
       }
     }
@@ -1234,6 +1363,127 @@ HTML_TEMPLATE = """
 
     function downloadCsv() {
       window.open('/api/download_csv', '_blank');
+    }
+
+    function openDataTableModal() {
+      if (!clientProfileCurve || !clientProfileCurve.azimuths) {
+        alert("Silakan proses foto atau muat gambar terlebih dahulu untuk melihat data numerik.");
+        return;
+      }
+      const modal = document.getElementById('dataTableModal');
+      modal.style.display = 'flex';
+      renderDataTable(document.getElementById('selTableInterval').value || '0.5');
+    }
+
+    function closeDataTableModal() {
+      document.getElementById('dataTableModal').style.display = 'none';
+    }
+
+    function renderDataTable(mode) {
+      if (!clientProfileCurve || !clientProfileCurve.azimuths) return;
+      const azs = clientProfileCurve.azimuths;
+      const els = clientProfileCurve.elevations;
+      const dip = clientProfileCurve.dip_deg || 0.20;
+
+      let minEl = 999, maxEl = -999;
+      for (let i = 0; i < els.length; i++) {
+        if (els[i] < minEl) minEl = els[i];
+        if (els[i] > maxEl) maxEl = els[i];
+      }
+      const minAz = azs[0];
+      const maxAz = azs[azs.length - 1];
+
+      document.getElementById('tblAzRange').innerText = minAz.toFixed(2) + "° s.d. " + maxAz.toFixed(2) + "°";
+      document.getElementById('tblDipVal').innerText = "-" + dip.toFixed(2) + "°";
+      document.getElementById('tblElevRange').innerText = (minEl >= 0 ? "+" : "") + minEl.toFixed(2) + "° s.d. " + (maxEl >= 0 ? "+" : "") + maxEl.toFixed(2) + "°";
+
+      const tbody = document.getElementById('numericTableBody');
+      tbody.innerHTML = "";
+
+      let stepInterval = 0.5;
+      if (mode === "0.25") stepInterval = 0.25;
+      else if (mode === "0.1") stepInterval = 0.10;
+      else if (mode === "all") stepInterval = 0.0;
+
+      let selectedRows = [];
+      if (stepInterval === 0.0) {
+        for (let i = 0; i < azs.length; i++) {
+          selectedRows.push({ az: azs[i], el: els[i] });
+        }
+      } else {
+        let lastTarget = Math.floor(minAz / stepInterval) * stepInterval;
+        while (lastTarget <= maxAz + 0.001) {
+          if (lastTarget >= minAz - 0.001 && lastTarget <= maxAz + 0.001) {
+            let bestIdx = 0, bestDiff = 9999;
+            for (let i = 0; i < azs.length; i++) {
+              const diff = Math.abs(azs[i] - lastTarget);
+              if (diff < bestDiff) {
+                bestDiff = diff;
+                bestIdx = i;
+              }
+            }
+            selectedRows.push({ az: azs[bestIdx], el: els[bestIdx] });
+          }
+          lastTarget += stepInterval;
+        }
+      }
+
+      document.getElementById('tblSampleCount').innerText = selectedRows.length + " Titik Data";
+
+      let html = "";
+      selectedRows.forEach((row, idx) => {
+        const el = row.el;
+        const az = row.az;
+        const elStr = (el >= 0 ? "+" : "") + el.toFixed(2) + "°";
+        const dmsStr = formatDms(el);
+        const deltaHakiki = el - 0.0;
+        const deltaHakikiStr = (deltaHakiki >= 0 ? "+" : "") + deltaHakiki.toFixed(2) + "°";
+        const deltaDip = el - (-dip);
+        const deltaDipStr = (deltaDip >= 0 ? "+" : "") + deltaDip.toFixed(2) + "°";
+
+        let badgeHtml = "";
+        if (el <= -dip + 0.05) {
+          badgeHtml = '<span class="badge" style="background:#064e3b; color:#34d399; border:1px solid #059669;">Sangat Terbuka (Bebas)</span>';
+        } else if (el <= 0.0) {
+          badgeHtml = '<span class="badge" style="background:#065f46; color:#a7f3d0; border:1px solid #10b981;">Ufuk Rendah Terbuka</span>';
+        } else if (el <= 1.2) {
+          badgeHtml = '<span class="badge" style="background:#0c4a6e; color:#38bdf8; border:1px solid #0284c7;">Halangan Rendah (Aman)</span>';
+        } else {
+          badgeHtml = '<span class="badge" style="background:#451a03; color:#fcd34d; border:1px solid #d97706;">Halangan Tinggi (Waspada)</span>';
+        }
+
+        const bgCol = idx % 2 === 0 ? '#131b2a' : '#172235';
+        html += `<tr style="background: ${bgCol}; border-bottom: 1px solid #1e293b;">
+          <td style="padding: 8px 12px; color: #64748b; font-family: monospace; border-right: 1px solid #1e293b;">${idx + 1}</td>
+          <td style="padding: 8px 12px; font-weight: bold; color: #38bdf8; font-family: monospace; border-right: 1px solid #1e293b;">${az.toFixed(2)}°</td>
+          <td style="padding: 8px 12px; font-weight: bold; color: #f8fafc; font-family: monospace; border-right: 1px solid #1e293b;">${elStr}</td>
+          <td style="padding: 8px 12px; color: #cbd5e1; font-family: monospace; border-right: 1px solid #1e293b;">${dmsStr}</td>
+          <td style="padding: 8px 12px; color: #94a3b8; font-family: monospace; border-right: 1px solid #1e293b;">${deltaHakikiStr}</td>
+          <td style="padding: 8px 12px; color: #94a3b8; font-family: monospace; border-right: 1px solid #1e293b;">${deltaDipStr}</td>
+          <td style="padding: 8px 12px;">${badgeHtml}</td>
+        </tr>`;
+      });
+      tbody.innerHTML = html;
+    }
+
+    function copyTableToClipboard() {
+      const tbody = document.getElementById('numericTableBody');
+      const rows = tbody.querySelectorAll('tr');
+      if (rows.length === 0) {
+        alert("Tidak ada data untuk disalin.");
+        return;
+      }
+      const headerRow = ["No", "Azimut (°)", "Elevasi Mar'i (°)", "Format DMS", "Selisih Hakiki (Δ0°)", "Selisih Laut (ΔDip)", "Status"].join("\\t");
+      let tsv = headerRow + "\\n";
+      rows.forEach(r => {
+        const cells = Array.from(r.querySelectorAll('td')).map(c => c.innerText.trim());
+        tsv += cells.join("\\t") + "\\n";
+      });
+      navigator.clipboard.writeText(tsv).then(() => {
+        alert("Tabel data berhasil disalin ke clipboard! Anda bisa langsung menempelkannya (paste) ke Microsoft Excel atau Google Sheets.");
+      }).catch(err => {
+        alert("Gagal menyalin: " + err.message);
+      });
     }
 
     function resetObservation() {
