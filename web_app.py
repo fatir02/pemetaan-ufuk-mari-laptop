@@ -24,7 +24,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from core.cv_engine import HorizonDetector
 from core.falak_calc import calculate_dip, classify_obstacle, format_dms
-from core.report_generator import export_pdf_report, export_csv_data
+from core.report_generator import export_pdf_report, export_csv_data, export_excel_data
 from core.sample_generator import generate_synthetic_horizon
 
 app = Flask(__name__)
@@ -674,7 +674,7 @@ HTML_TEMPLATE = """
 
               <div class="grid-2">
                 <button type="button" class="btn btn-secondary btn-sm" onclick="openDataTableModal()">
-                  📊 Buka Tabel & Ekspor Data (CSV)
+                  📊 Buka Tabel & Ekspor Data (Excel / CSV)
                 </button>
                 <button type="button" class="btn btn-primary btn-sm" onclick="resetObservation()">
                   🚀 Mulai Pengamatan Baru
@@ -708,7 +708,8 @@ HTML_TEMPLATE = """
           <option value="0.1">Interval 0.10° (Rapat)</option>
           <option value="all">Semua Titik Sampel</option>
         </select>
-        <button type="button" class="doc-btn" style="background: #059669; color: #fff;" onclick="downloadCsv()">📥 Unduh File CSV</button>
+        <button type="button" class="doc-btn" style="background: #10b981; color: #fff; font-weight: bold;" onclick="downloadExcel()">📊 Unduh Excel (.xlsx)</button>
+        <button type="button" class="doc-btn" style="background: #0284c7; color: #fff;" onclick="downloadCsv()">📥 Unduh CSV</button>
         <button type="button" class="doc-btn" onclick="copyTableToClipboard()">📋 Salin Teks</button>
       </div>
     </div>
@@ -1361,8 +1362,16 @@ HTML_TEMPLATE = """
       window.open('/api/download_pdf?loc=' + loc, '_blank');
     }
 
+    function downloadExcel() {
+      const loc = encodeURIComponent(document.getElementById('editLocation').value.trim() || "Pos Observasi");
+      const step = document.getElementById('selTableInterval').value || '0.5';
+      window.open('/api/download_excel?loc=' + loc + '&step=' + step, '_blank');
+    }
+
     function downloadCsv() {
-      window.open('/api/download_csv', '_blank');
+      const loc = encodeURIComponent(document.getElementById('editLocation').value.trim() || "Pos Observasi");
+      const step = document.getElementById('selTableInterval').value || '0.5';
+      window.open('/api/download_csv?loc=' + loc + '&step=' + step, '_blank');
     }
 
     function openDataTableModal() {
@@ -1826,15 +1835,61 @@ def api_download_csv():
     os.makedirs(exports_dir, exist_ok=True)
     csv_path = os.path.join(exports_dir, f"Data_Ufuk_Web_{int(time.time())}.csv")
 
+    loc = request.args.get("loc", "Pos Observasi Falak (Laptop)").strip() or "Pos Observasi Falak (Laptop)"
+    step_arg = request.args.get("step", None)
+    sampling_step = None
+    if step_arg and step_arg != "all":
+        try:
+            sampling_step = float(step_arg)
+        except ValueError:
+            sampling_step = None
+
     export_csv_data(
         output_csv_path=csv_path,
         profile_data=LAST_ANALYSIS["profile_data"],
-        location_name="Pos Observasi Falak (Laptop)",
+        location_name=loc,
         az_center=LAST_ANALYSIS["azimuth"],
         dip_deg=LAST_ANALYSIS["profile_data"]["dip_deg"],
+        sampling_step=sampling_step,
     )
 
     return send_file(csv_path, as_attachment=True, download_name="Data_Profil_Ufuk.csv")
+
+
+@app.route("/api/download_excel", methods=["GET"])
+def api_download_excel():
+    global LAST_ANALYSIS
+    if not LAST_ANALYSIS:
+        return "Belum ada data analisis aktif", 400
+
+    exports_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "exports")
+    os.makedirs(exports_dir, exist_ok=True)
+    excel_path = os.path.join(exports_dir, f"Data_Ufuk_Web_{int(time.time())}.xlsx")
+
+    loc = request.args.get("loc", "Pos Observasi Falak (Laptop)").strip() or "Pos Observasi Falak (Laptop)"
+    step_arg = request.args.get("step", "0.5")
+    sampling_step = None
+    if step_arg and step_arg != "all":
+        try:
+            sampling_step = float(step_arg)
+        except ValueError:
+            sampling_step = None
+
+    export_excel_data(
+        output_excel_path=excel_path,
+        profile_data=LAST_ANALYSIS["profile_data"],
+        location_name=loc,
+        az_center=LAST_ANALYSIS["azimuth"],
+        dip_deg=LAST_ANALYSIS["profile_data"]["dip_deg"],
+        sampling_step=sampling_step,
+    )
+
+    return send_file(
+        excel_path,
+        as_attachment=True,
+        download_name="Data_Profil_Ufuk_Tabel_Excel.xlsx",
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
 
 
 def main():

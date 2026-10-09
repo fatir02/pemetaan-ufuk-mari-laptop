@@ -7,6 +7,7 @@ foto overlay kontur, grafik kurva elevasi, tabel hasil analisis, dan rekomendasi
 
 import os
 import time
+import math
 from typing import Dict, Any, Optional
 import numpy as np
 import cv2
@@ -379,46 +380,296 @@ def export_pdf_report(
     return output_pdf_path
 
 
+def _prepare_table_rows(
+    profile_data: Dict[str, Any],
+    dip_val: float,
+    sampling_step: Optional[float] = None,
+):
+    azimuths = profile_data["azimuths"]
+    elevations = profile_data["elevations"]
+
+    rows = []
+    if sampling_step is not None and sampling_step > 0.0:
+        min_az = float(azimuths[0])
+        max_az = float(azimuths[-1])
+        last_target = math.floor(min_az / sampling_step) * sampling_step
+        while last_target <= max_az + 0.0001:
+            if last_target >= min_az - 0.0001 and last_target <= max_az + 0.0001:
+                best_idx = 0
+                best_diff = 9999.0
+                for i in range(len(azimuths)):
+                    diff = abs(float(azimuths[i]) - last_target)
+                    if diff < best_diff:
+                        best_diff = diff
+                        best_idx = i
+                rows.append((best_idx, float(azimuths[best_idx]), float(elevations[best_idx])))
+            last_target += sampling_step
+    else:
+        for x in range(len(azimuths)):
+            rows.append((x, float(azimuths[x]), float(elevations[x])))
+
+    result = []
+    for num, (col_x, az, el) in enumerate(rows, start=1):
+        dms = format_dms(el)
+        delta_hakiki = el - 0.0
+        delta_dip = el - (-dip_val)
+        if el <= -dip_val + 0.05:
+            status = "Sangat Terbuka (Bebas)"
+        elif el <= 0.0:
+            status = "Ufuk Rendah Terbuka"
+        elif el <= 1.2:
+            status = "Halangan Rendah (Aman)"
+        else:
+            status = "Halangan Tinggi (Waspada)"
+        result.append({
+            "no": num,
+            "col_x": col_x,
+            "az": az,
+            "el": el,
+            "dms": dms,
+            "delta_hakiki": delta_hakiki,
+            "delta_dip": delta_dip,
+            "status": status,
+        })
+    return result
+
+
 def export_csv_data(
     output_csv_path: str,
     location_name: str,
     az_center: float,
     profile_data: Dict[str, Any],
     dip_deg: Optional[float] = None,
+    sampling_step: Optional[float] = None,
 ) -> str:
     """
     Mengekspor data numerik profil ufuk (Azimuth, Elevation, Horizon_Y) ke file CSV
-    dalam format tabel yang rapi, informatif, dan mudah dibaca.
+    dalam format tabel yang rapi, berstandar Excel (UTF-8 BOM + auto-delimiter sep=,).
     """
     os.makedirs(os.path.dirname(os.path.abspath(output_csv_path)), exist_ok=True)
-    azimuths = profile_data["azimuths"]
-    elevations = profile_data["elevations"]
-    horizon_y = profile_data["horizon_y"]
     dip_val = float(dip_deg) if dip_deg is not None else float(profile_data.get("dip_deg", 0.0))
+    table_rows = _prepare_table_rows(profile_data, dip_val, sampling_step)
 
-    with open(output_csv_path, "w", encoding="utf-8") as f:
-        f.write("# ==========================================================================\n")
-        f.write("# TABEL DATA NUMERIK PROFIL UFUK MAR'I BERBASIS COMPUTER VISION\n")
-        f.write(f"# Pos Observasi Falak     : {location_name}\n")
-        f.write(f"# Azimut Bidikan Utama    : {az_center:.2f}° (Barat)\n")
-        f.write(f"# Kerendahan Ufuk Laut Dip: -{dip_val:.4f}°\n")
-        f.write(f"# Waktu Ekspor            : {time.strftime('%Y-%m-%d %H:%M:%S')} WIB\n")
-        f.write("# ==========================================================================\n")
-        f.write("No,Kolom_Pixel_X,Azimut_deg,Elevasi_Halangan_deg,Elevasi_DMS,Selisih_Hakiki_deg,Selisih_Dip_deg,Status_Rukyat\n")
-        for x in range(len(azimuths)):
-            el = float(elevations[x])
-            az = float(azimuths[x])
-            dms = format_dms(el)
-            delta_hakiki = el - 0.0
-            delta_dip = el - (-dip_val)
-            if el <= -dip_val + 0.05:
-                status = "Sangat Terbuka"
-            elif el <= 0.0:
-                status = "Ufuk Rendah Terbuka"
-            elif el <= 1.2:
-                status = "Halangan Rendah (Aman)"
-            else:
-                status = "Halangan Tinggi (Waspada)"
-            f.write(f"{x + 1},{x},{az:.4f},{el:+.4f},\"{dms}\",{delta_hakiki:+.4f},{delta_dip:+.4f},{status}\n")
+    with open(output_csv_path, "w", encoding="utf-8-sig") as f:
+        f.write("sep=,\n")
+        f.write("TABEL DATA NUMERIK PROFIL UFUK MAR'I BERBASIS COMPUTER VISION\n")
+        safe_loc = location_name.replace('"', '""')
+        f.write(f"Pos Observasi Falak,\"{safe_loc}\"\n")
+        f.write(f"Azimut Bidikan Utama,\"{az_center:.2f}° (Barat)\"\n")
+        f.write(f"Kerendahan Ufuk Laut Dip,\"-{dip_val:.4f}°\"\n")
+        f.write(f"Waktu Ekspor,\"{time.strftime('%Y-%m-%d %H:%M:%S')} WIB\"\n")
+        f.write("\n")
+        f.write("No,Kolom (Pixel X),Azimut (°),Elevasi Halangan (°),Elevasi (DMS),Selisih Hakiki (Δ0°),Selisih Laut (ΔDip),Status Kelayakan Rukyat\n")
+        for r in table_rows:
+            f.write(
+                f"{r['no']},{r['col_x']},{r['az']:.4f},{r['el']:+.4f},\"{r['dms']}\","
+                f"{r['delta_hakiki']:+.4f},{r['delta_dip']:+.4f},\"{r['status']}\"\n"
+            )
 
     return output_csv_path
+
+
+def export_excel_data(
+    output_excel_path: str,
+    location_name: str,
+    az_center: float,
+    profile_data: Dict[str, Any],
+    dip_deg: Optional[float] = None,
+    sampling_step: Optional[float] = None,
+) -> str:
+    """
+    Mengekspor data numerik profil ufuk ke file Excel (.xlsx) dengan format tabel
+    profesional, grid border, header berwarna, auto-width, dan filter aktif.
+    """
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.utils import get_column_letter
+
+    os.makedirs(os.path.dirname(os.path.abspath(output_excel_path)), exist_ok=True)
+    dip_val = float(dip_deg) if dip_deg is not None else float(profile_data.get("dip_deg", 0.0))
+    table_rows = _prepare_table_rows(profile_data, dip_val, sampling_step)
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    if ws is None:
+        ws = wb.create_sheet("Profil Ufuk Mar'i")
+    else:
+        ws.title = "Profil Ufuk Mar'i"
+    ws.views.sheetView[0].showGridLines = True
+
+    font_title = Font(name="Segoe UI", size=13, bold=True, color="FFFFFF")
+    fill_title = PatternFill(start_color="0F172A", end_color="0F172A", fill_type="solid")
+
+    font_meta_lbl = Font(name="Segoe UI", size=10, bold=True, color="334155")
+    font_meta_val = Font(name="Segoe UI", size=10, bold=False, color="0F172A")
+    fill_meta = PatternFill(start_color="F1F5F9", end_color="F1F5F9", fill_type="solid")
+
+    font_header = Font(name="Segoe UI", size=10, bold=True, color="FFFFFF")
+    fill_header = PatternFill(start_color="1E293B", end_color="1E293B", fill_type="solid")
+
+    font_data = Font(name="Consolas", size=10, color="0F172A")
+    fill_zebra = PatternFill(start_color="F8FAFC", end_color="F8FAFC", fill_type="solid")
+    fill_white = PatternFill(start_color="FFFFFF", end_color="FFFFFF", fill_type="solid")
+
+    thin_border = Border(
+        left=Side(style="thin", color="CBD5E1"),
+        right=Side(style="thin", color="CBD5E1"),
+        top=Side(style="thin", color="CBD5E1"),
+        bottom=Side(style="thin", color="CBD5E1"),
+    )
+
+    align_center = Alignment(horizontal="center", vertical="center")
+    align_right = Alignment(horizontal="right", vertical="center")
+    align_left = Alignment(horizontal="left", vertical="center")
+
+    # Title Banner (Row 1)
+    ws.merge_cells("A1:H1")
+    cell_a1 = ws["A1"]
+    cell_a1.value = "TABEL DATA NUMERIK PROFIL UFUK MAR'I BERBASIS COMPUTER VISION"
+    cell_a1.font = font_title
+    cell_a1.fill = fill_title
+    cell_a1.alignment = align_center
+    ws.row_dimensions[1].height = 28
+
+    # Metadata (Rows 2 - 5)
+    metadata = [
+        ("Pos Observasi Falak", location_name),
+        ("Azimut Bidikan Utama", f"{az_center:.2f}° (Barat)"),
+        ("Kerendahan Ufuk Laut (Dip)", f"-{dip_val:.4f}°"),
+        ("Waktu Ekspor Data", f"{time.strftime('%Y-%m-%d %H:%M:%S')} WIB"),
+    ]
+    for row_idx, (lbl, val) in enumerate(metadata, start=2):
+        ws.row_dimensions[row_idx].height = 20
+        c_lbl = ws.cell(row=row_idx, column=1, value=lbl)
+        c_lbl.font = font_meta_lbl
+        c_lbl.fill = fill_meta
+        c_lbl.border = thin_border
+
+        ws.merge_cells(start_row=row_idx, start_column=2, end_row=row_idx, end_column=8)
+        c_val = ws.cell(row=row_idx, column=2, value=val)
+        c_val.font = font_meta_val
+        c_val.alignment = align_left
+        for col_i in range(2, 9):
+            ws.cell(row=row_idx, column=col_i).border = thin_border
+
+    # Row 6 blank
+    ws.row_dimensions[6].height = 10
+
+    # Table Headers (Row 7)
+    headers = [
+        "No",
+        "Kolom (Pixel X)",
+        "Azimut (°)",
+        "Elevasi Halangan (°)",
+        "Elevasi (DMS)",
+        "Selisih Hakiki (Δ0°)",
+        "Selisih Laut (ΔDip)",
+        "Status Kelayakan Rukyat",
+    ]
+    header_row = 7
+    ws.row_dimensions[header_row].height = 26
+    for col_idx, h_text in enumerate(headers, start=1):
+        cell = ws.cell(row=header_row, column=col_idx, value=h_text)
+        cell.font = font_header
+        cell.fill = fill_header
+        cell.alignment = align_center
+        cell.border = thin_border
+
+    # Status styles
+    status_styles = {
+        "Sangat Terbuka (Bebas)": (
+            PatternFill(start_color="DCFCE7", end_color="DCFCE7", fill_type="solid"),
+            Font(name="Segoe UI", size=10, bold=True, color="166534"),
+        ),
+        "Ufuk Rendah Terbuka": (
+            PatternFill(start_color="E0F2FE", end_color="E0F2FE", fill_type="solid"),
+            Font(name="Segoe UI", size=10, bold=True, color="0369A1"),
+        ),
+        "Halangan Rendah (Aman)": (
+            PatternFill(start_color="E0F2FE", end_color="E0F2FE", fill_type="solid"),
+            Font(name="Segoe UI", size=10, bold=True, color="0284C7"),
+        ),
+        "Halangan Tinggi (Waspada)": (
+            PatternFill(start_color="FEF3C7", end_color="FEF3C7", fill_type="solid"),
+            Font(name="Segoe UI", size=10, bold=True, color="92400E"),
+        ),
+    }
+
+    current_row = header_row + 1
+    for r in table_rows:
+        ws.row_dimensions[current_row].height = 20
+        row_fill = fill_white if (r["no"] % 2 == 1) else fill_zebra
+
+        # No
+        c_no = ws.cell(row=current_row, column=1, value=r["no"])
+        c_no.alignment = align_center
+
+        # Kolom X
+        c_col = ws.cell(row=current_row, column=2, value=r["col_x"])
+        c_col.alignment = align_center
+
+        # Azimut
+        c_az = ws.cell(row=current_row, column=3, value=round(r["az"], 4))
+        c_az.alignment = align_right
+        c_az.number_format = '0.0000"°"'
+
+        # Elevasi
+        c_el = ws.cell(row=current_row, column=4, value=round(r["el"], 4))
+        c_el.alignment = align_right
+        c_el.number_format = '+0.0000"°";-0.0000"°";0.0000"°"'
+
+        # DMS
+        c_dms = ws.cell(row=current_row, column=5, value=r["dms"])
+        c_dms.alignment = align_center
+
+        # Selisih Hakiki
+        c_dh = ws.cell(row=current_row, column=6, value=round(r["delta_hakiki"], 4))
+        c_dh.alignment = align_right
+        c_dh.number_format = '+0.0000"°";-0.0000"°";0.0000"°"'
+
+        # Selisih Dip
+        c_dd = ws.cell(row=current_row, column=7, value=round(r["delta_dip"], 4))
+        c_dd.alignment = align_right
+        c_dd.number_format = '+0.0000"°";-0.0000"°";0.0000"°"'
+
+        # Status
+        st = r["status"]
+        c_st = ws.cell(row=current_row, column=8, value=st)
+        c_st.alignment = align_center
+        if st in status_styles:
+            c_st.fill, c_st.font = status_styles[st]
+        else:
+            c_st.font = font_data
+            c_st.fill = row_fill
+
+        for col_idx in range(1, 8):
+            cell = ws.cell(row=current_row, column=col_idx)
+            cell.font = font_data
+            cell.fill = row_fill
+            cell.border = thin_border
+        c_st.border = thin_border
+
+        current_row += 1
+
+    last_data_row = current_row - 1
+
+    # Auto Filter
+    ws.auto_filter.ref = f"A{header_row}:H{last_data_row}"
+
+    # Auto column width
+    for col in ws.columns:
+        col_idx = col[0].column
+        if not isinstance(col_idx, int):
+            continue
+        col_letter = get_column_letter(col_idx)
+        max_len = 0
+        for cell in col:
+            if cell.row < header_row:
+                continue
+            val_str = str(cell.value or "")
+            if len(val_str) > max_len:
+                max_len = len(val_str)
+        ws.column_dimensions[col_letter].width = max(max_len + 4, 12)
+
+    wb.save(output_excel_path)
+    return output_excel_path
