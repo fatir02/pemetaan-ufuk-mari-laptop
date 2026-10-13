@@ -19,13 +19,14 @@ from PyQt5.QtWidgets import (
     QFrame, QSlider, QDialog, QLineEdit, QFileDialog, QMessageBox,
     QScrollArea
 )
-from PyQt5.QtCore import Qt, pyqtSignal
+from PyQt5.QtCore import Qt, pyqtSignal, QTimer
 from PyQt5.QtGui import QImage, QPixmap
 
 from core.camera_worker import CameraWorker
 from core.sample_generator import generate_synthetic_horizon
 from core.cv_engine import HorizonDetector
 from core.falak_calc import calculate_dip, parse_dms, format_dms
+from core.compass_service import compass_service
 from ui.widgets.image_viewer import InteractiveImageViewer
 
 
@@ -121,6 +122,11 @@ class ScreenObservation(QWidget):
 
         self._init_ui()
         self._load_initial_sample()
+
+        compass_service.start()
+        self.sensor_timer = QTimer(self)
+        self.sensor_timer.timeout.connect(self._poll_sensor_service)
+        self.sensor_timer.start(100)
 
     def _init_ui(self):
         main_layout = QVBoxLayout(self)
@@ -445,6 +451,47 @@ class ScreenObservation(QWidget):
         l.addWidget(t_lbl)
         l.addWidget(v_lbl)
         return card
+
+    def _poll_sensor_service(self):
+        data = compass_service.get_data()
+        if not data.get("connected"):
+            return
+        az = float(data.get("azimuth", 270.0))
+        tilt = float(data.get("tilt", 0.0))
+        self.azimuth_val = az
+        self.elevation_val = tilt
+
+        val_lbl = self.card_azimuth.findChild(QLabel, "ValLabel")
+        if val_lbl:
+            val_lbl.setText(f"{az:.1f}°")
+
+        el_lbl = self.card_elevation.findChild(QLabel, "ValLabel")
+        if el_lbl:
+            el_lbl.setText(f"{tilt:+.1f}°")
+
+        slider_val = int(az * 10)
+        if self.slider_azimuth.minimum() <= slider_val <= self.slider_azimuth.maximum():
+            self.slider_azimuth.blockSignals(True)
+            self.slider_azimuth.setValue(slider_val)
+            self.slider_azimuth.blockSignals(False)
+
+        is_west = abs(az - 270.0) <= 2.5
+        if is_west:
+            self.badge_west.setText(f"🧭 TEPAT KE BARAT ({az:.1f}°)")
+            self.badge_west.setStyleSheet("""
+                background-color: #10b981; color: #ffffff;
+                font-size: 12px; font-weight: 800; padding: 6px 18px;
+                border-radius: 14px;
+            """)
+            self.image_viewer.set_crosshair(True, is_locked=True)
+        else:
+            self.badge_west.setText(f"🧭 AZIMUTH: {az:.1f}°")
+            self.badge_west.setStyleSheet("""
+                background-color: #1e293b; color: #38bdf8;
+                font-size: 12px; font-weight: bold; padding: 6px 18px;
+                border-radius: 14px;
+            """)
+            self.image_viewer.set_crosshair(True, is_locked=False)
 
     def _on_azimuth_slider_changed(self, val_int: int):
         """Dipicu saat slider arah azimuth diubah."""

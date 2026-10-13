@@ -22,5 +22,4 @@ Desktop.ini
 # Logs & runtime artifacts
 *.log
 app_log.txt
-exports/Data_Ufuk_Web_*
-exports/Laporan_Ufuk_*
+exports/

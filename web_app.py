@@ -26,9 +26,11 @@ from core.cv_engine import HorizonDetector
 from core.falak_calc import calculate_dip, classify_obstacle, format_dms
 from core.report_generator import export_pdf_report, export_csv_data, export_excel_data
 from core.sample_generator import generate_synthetic_horizon
+from core.compass_service import compass_service
 
 app = Flask(__name__)
 detector = HorizonDetector()
+compass_service.start()
 
 # Cache analisis terakhir
 LAST_ANALYSIS = {}
@@ -221,20 +223,26 @@ HTML_TEMPLATE = """
     /* Gaya Viewfinder Kamera Live */
     #liveCamWrapper {
       display: none;
-      position: relative;
       width: 100%;
       border-radius: 12px;
       overflow: hidden;
-      background-color: #000000;
+      background-color: #0b0f17;
       border: 2px solid #38bdf8;
       margin-bottom: 14px;
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.7);
+    }
+    .cam-viewport-box {
+      position: relative;
+      width: 100%;
+      background: #000000;
+      overflow: hidden;
+      display: block;
     }
     #cameraVideo {
       width: 100%;
-      height: auto;
+      height: 480px;
       display: block;
       object-fit: cover;
-      max-height: 440px;
     }
     #cameraOverlay {
       position: absolute;
@@ -271,6 +279,65 @@ HTML_TEMPLATE = """
       padding: 8px 14px;
       font-size: 0.8rem;
       cursor: pointer;
+    }
+    .btn-fullscreen-cam {
+      background: rgba(15, 23, 42, 0.85);
+      color: #38bdf8;
+      border: 1px solid #0284c7;
+      border-radius: 20px;
+      padding: 8px 14px;
+      font-size: 0.8rem;
+      font-weight: bold;
+      cursor: pointer;
+      transition: 0.15s;
+    }
+    .btn-fullscreen-cam:hover {
+      background: #0284c7;
+      color: #ffffff;
+    }
+
+    /* Indikator Status Sensor Minimalis di Sudut Kamera */
+    .cam-sensor-badge {
+      position: absolute;
+      top: 10px;
+      left: 12px;
+      z-index: 25;
+      background: rgba(15, 23, 42, 0.78);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      border: 1px solid rgba(51, 65, 85, 0.8);
+      border-radius: 20px;
+      padding: 4px 10px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: #94a3b8;
+      pointer-events: none;
+    }
+    .status-indicator-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #ef4444;
+      display: inline-block;
+    }
+    .status-indicator-dot.active {
+      background: #10b981;
+      box-shadow: 0 0 8px #10b981;
+      animation: pulse-dot 1.5s infinite;
+    }
+    @keyframes pulse-dot {
+      0% { opacity: 0.7; transform: scale(0.95); }
+      50% { opacity: 1; transform: scale(1.15); }
+      100% { opacity: 0.7; transform: scale(0.95); }
+    }
+
+    /* Saat Kamera Live Aktif: Menyembunyikan Drop Area dan Memenuhi Layar Kiri */
+    body.camera-live-active #dropArea,
+    body.camera-live-active #rawPreview {
+      display: none !important;
     }
 
     /* Modal / Viewer Dokumen PDF Laporan Ringan */
@@ -375,6 +442,15 @@ HTML_TEMPLATE = """
         gap: 20px;
         align-items: start;
       }
+      /* Mode Kamera Live Aktif: Layar Kiri Diperluas Memenuhi Viewport */
+      body.camera-live-active .dashboard-grid {
+        grid-template-columns: 1.15fr 0.85fr;
+      }
+      body.camera-live-active #cameraVideo {
+        height: 560px;
+        max-height: calc(100vh - 220px);
+        min-height: 480px;
+      }
       .dual-visual-wrapper {
         display: grid;
         grid-template-columns: 1fr 1fr;
@@ -462,15 +538,22 @@ HTML_TEMPLATE = """
               <p style="color: #64748b; margin-top: 4px;"><i>Nanti saat sudah memiliki alat teleskop / USB eyepiece camera khusus, cukup colok kabel USB ke laptop dan pilih dari dropdown yang sama.</i></p>
             </div>
 
-            <video id="cameraVideo" playsinline autoplay muted></video>
-            <canvas id="cameraOverlay"></canvas>
-            <div class="cam-controls">
-              <button type="button" class="btn-shutter" onclick="captureLiveFrame()">
-                📸 AMBIL FRAME
-              </button>
-              <button type="button" class="btn-close-cam" onclick="stopLiveCamera()">
-                ✖️ Tutup Kamera
-              </button>
+            <!-- Frame Viewport Kamera Mandiri (Overlay Canvas Terkunci di Dalam Frame Video) -->
+            <div class="cam-viewport-box">
+              <video id="cameraVideo" playsinline autoplay muted></video>
+              <canvas id="cameraOverlay"></canvas>
+
+              <div class="cam-controls">
+                <button type="button" class="btn-shutter" onclick="captureLiveFrame()">
+                  📸 AMBIL FRAME
+                </button>
+                <button type="button" class="btn-fullscreen-cam" onclick="toggleCameraFullscreen()">
+                  ⛶ Layar Penuh
+                </button>
+                <button type="button" class="btn-close-cam" onclick="stopLiveCamera()">
+                  ✖️ Tutup Kamera
+                </button>
+              </div>
             </div>
           </div>
 
@@ -502,6 +585,9 @@ HTML_TEMPLATE = """
               <label>Kemiringan / Tilt (°):</label>
               <input type="number" id="inpTilt" value="0.0" step="0.1">
             </div>
+          </div>
+          <div id="compassLiveBadge" style="margin-bottom: 12px; padding: 6px 12px; background: #0f172a; border: 1px solid #334155; border-radius: 8px; font-size: 0.78rem; display: flex; align-items: center; justify-content: space-between;">
+            <span id="compassStatusText" style="color: #94a3b8;">🧭 Kompas Hardware: Memeriksa COM7...</span>
           </div>
 
           <div class="grid-3">
@@ -783,6 +869,73 @@ HTML_TEMPLATE = """
     let sliderDebounceTimer = null;
     let lastHudDrawTime = 0;
     let clientProfileCurve = null;
+    let liveCompassConnected = false;
+    let liveCompassAzimuth = 270.0;
+    let liveCompassTilt = 0.0;
+
+    function getCardinalDirection(deg) {
+      deg = ((deg % 360) + 360) % 360;
+      if (deg >= 337.5 || deg < 22.5) return "UTARA";
+      if (deg >= 22.5 && deg < 67.5) return "TIMUR LAUT";
+      if (deg >= 67.5 && deg < 112.5) return "TIMUR";
+      if (deg >= 112.5 && deg < 157.5) return "TENGGARA";
+      if (deg >= 157.5 && deg < 202.5) return "SELATAN";
+      if (deg >= 202.5 && deg < 247.5) return "BARAT DAYA";
+      if (deg >= 247.5 && deg < 292.5) return "BARAT";
+      return "BARAT LAUT";
+    }
+
+    async function pollCompassData() {
+      try {
+        const res = await fetch('/api/compass');
+        if (!res.ok) return;
+        const data = await res.json();
+        const badge = document.getElementById('compassLiveBadge');
+        const topDot = document.getElementById('topHudDot');
+        const topMsg = document.getElementById('topHudStatusMsg');
+
+        if (data.connected) {
+          liveCompassConnected = true;
+          liveCompassAzimuth = (data.azimuth !== undefined && data.azimuth !== null) ? Number(data.azimuth) : 270.0;
+          liveCompassTilt = (data.tilt !== undefined && data.tilt !== null) ? Number(data.tilt) : 0.0;
+          const azInp = document.getElementById('inpAzimuth');
+          const tiltInp = document.getElementById('inpTilt');
+          if (azInp && document.activeElement !== azInp) {
+            azInp.value = liveCompassAzimuth.toFixed(1);
+          }
+          if (tiltInp && document.activeElement !== tiltInp) {
+            tiltInp.value = liveCompassTilt.toFixed(1);
+          }
+
+          const isWest = Math.abs(liveCompassAzimuth - 270.0) <= 2.5;
+          const cardName = getCardinalDirection(liveCompassAzimuth);
+
+          if (topDot) topDot.className = "status-indicator-dot active";
+          if (topMsg) {
+            topMsg.innerHTML = isWest
+              ? '<span style="color:#34d399; font-weight:800;">🎯 ' + (data.port || 'COM7') + ' (KUNCI BARAT)</span>'
+              : `<span>🟢 ${data.port || 'COM7'} Aktif</span>`;
+          }
+
+          if (badge) {
+            badge.style.borderColor = isWest ? '#10b981' : '#0284c7';
+            badge.innerHTML = '<span style="color:' + (isWest ? '#10b981' : '#38bdf8') + '; font-weight: 700;">' +
+              (isWest ? '🎯 TERKUNCI BARAT: ' : '🧭 ') + data.port + ': ' + liveCompassAzimuth.toFixed(1) + '° (' + cardName + ' | Tilt ' +
+              (liveCompassTilt > 0 ? '+' : '') + liveCompassTilt.toFixed(1) + '°)</span>' +
+              '<span style="color: #94a3b8; font-size: 0.72rem;">Mag: ' + (data.cal_mag || 0) + '/3 | Gyro: ' + (data.cal_gyro || 0) + '/3</span>';
+          }
+        } else {
+          liveCompassConnected = false;
+          if (topDot) topDot.className = "status-indicator-dot";
+          if (topMsg) topMsg.innerText = "⚠️ " + (data.status || "Sensor terputus");
+          if (badge) {
+            badge.style.borderColor = '#334155';
+            badge.innerHTML = '<span style="color: #94a3b8;">⚠️ ' + (data.status || 'Kompas tidak terdeteksi') + '</span>';
+          }
+        }
+      } catch (err) {}
+    }
+    setInterval(pollCompassData, 200);
 
     // Jam Falak Presisi (WIB UTC+7 & UTC)
     function updateClocks() {
@@ -927,6 +1080,7 @@ HTML_TEMPLATE = """
       const wrapper = document.getElementById('liveCamWrapper');
       const video = document.getElementById('cameraVideo');
       wrapper.style.display = 'block';
+      document.body.classList.add('camera-live-active');
 
       try {
         const targetId = preferredDeviceId || currentCameraDeviceId;
@@ -953,6 +1107,7 @@ HTML_TEMPLATE = """
       } catch (err) {
         alert("Tidak dapat membuka kamera: " + err.message + ". Pastikan izin kamera browser diaktifkan atau aplikasi webcam (Iriun/DroidCam) sudah berjalan.");
         wrapper.style.display = 'none';
+        document.body.classList.remove('camera-live-active');
       }
     }
 
@@ -966,6 +1121,23 @@ HTML_TEMPLATE = """
         animFrameId = null;
       }
       document.getElementById('liveCamWrapper').style.display = 'none';
+      document.body.classList.remove('camera-live-active');
+    }
+
+    function toggleCameraFullscreen() {
+      const wrapper = document.getElementById('liveCamWrapper');
+      if (!wrapper) return;
+      if (!document.fullscreenElement) {
+        if (wrapper.requestFullscreen) {
+          wrapper.requestFullscreen().catch(err => console.warn(err));
+        } else if (wrapper.webkitRequestFullscreen) {
+          wrapper.webkitRequestFullscreen();
+        }
+      } else {
+        if (document.exitFullscreen) {
+          document.exitFullscreen().catch(err => console.warn(err));
+        }
+      }
     }
 
     function drawLiveHudLoop(timestamp) {
@@ -989,65 +1161,218 @@ HTML_TEMPLATE = """
 
           const cy = h / 2.0;
           const cx = w / 2.0;
+          const scale = Math.max(1, w / 960);
 
-          ctx.strokeStyle = "rgba(255, 255, 255, 0.2)";
-          ctx.lineWidth = 1;
+          const curAz = liveCompassConnected ? liveCompassAzimuth : (parseFloat(document.getElementById('inpAzimuth').value) || 270.0);
+          const curTilt = liveCompassConnected ? liveCompassTilt : (parseFloat(document.getElementById('inpTilt').value) || 0.0);
+          const isWestLocked = Math.abs(curAz - 270.0) <= 2.5;
+          const isLevel = Math.abs(curTilt) <= 0.8;
+
+          // ==========================================================
+          // 1. KOMPAS HORIZONTAL ARAH MATA ANGIN MEMENUHI KIRI DAN KANAN
+          // ==========================================================
+          const tapeW = w; // Memenuhi kiri dan kanan penuh layar
+          const tapeH = 34 * scale;
+          const tapeX = 0;
+          const tapeY = 10 * scale;
+
+          ctx.save();
+          // Baseline garis kompas horizontal penuh dari ujung kiri (0) ke kanan (w)
+          ctx.strokeStyle = "rgba(255, 255, 255, 0.25)";
+          ctx.lineWidth = 1 * scale;
           ctx.beginPath();
-          ctx.moveTo(w / 3, 0); ctx.lineTo(w / 3, h);
-          ctx.moveTo(2 * w / 3, 0); ctx.lineTo(2 * w / 3, h);
-          ctx.moveTo(0, h / 3); ctx.lineTo(w, h / 3);
-          ctx.moveTo(0, 2 * h / 3); ctx.lineTo(w, 2 * h / 3);
+          ctx.moveTo(0, tapeY + tapeH);
+          ctx.lineTo(w, tapeY + tapeH);
           ctx.stroke();
 
-          ctx.strokeStyle = "#38bdf8";
-          ctx.lineWidth = 2;
-          ctx.setLineDash([12, 8]);
+          // Garis skala derajat kompas horizontal bergerak live penuh layar
+          const visibleFov = 90; // Rentang pandang pita kompas penuh
+          const pxPerDeg = w / visibleFov;
+          const startDeg = Math.floor(curAz - (visibleFov / 2) - 2);
+          const endDeg = Math.ceil(curAz + (visibleFov / 2) + 2);
+
+          for (let d = startDeg; d <= endDeg; d++) {
+            const xPos = cx + (d - curAz) * pxPerDeg;
+            if (xPos < 0 || xPos > w) continue;
+            const normDeg = ((d % 360) + 360) % 360;
+
+            if (normDeg % 45 === 0) {
+              // Arah Mata Angin Utama (N, NE, E, SE, S, SW, W, NW)
+              let card = "";
+              if (normDeg === 0) card = "U";
+              else if (normDeg === 45) card = "TL";
+              else if (normDeg === 90) card = "T";
+              else if (normDeg === 135) card = "TG";
+              else if (normDeg === 180) card = "S";
+              else if (normDeg === 225) card = "BD";
+              else if (normDeg === 270) card = "B";
+              else if (normDeg === 315) card = "BL";
+
+              const isTargetWest = normDeg === 270;
+              ctx.strokeStyle = isTargetWest ? "#10b981" : "#38bdf8";
+              ctx.lineWidth = isTargetWest ? 2.5 * scale : 1.8 * scale;
+              ctx.beginPath();
+              ctx.moveTo(xPos, tapeY + tapeH);
+              ctx.lineTo(xPos, tapeY + tapeH - (18 * scale));
+              ctx.stroke();
+
+              ctx.fillStyle = isTargetWest ? "#34d399" : "#38bdf8";
+              ctx.font = `bold ${Math.round((isTargetWest ? 13 : 11) * scale)}px sans-serif`;
+              ctx.textAlign = "center";
+              ctx.shadowColor = "rgba(0, 0, 0, 0.9)";
+              ctx.shadowBlur = 4;
+              ctx.fillText(isTargetWest ? "270° B" : card, xPos, tapeY + tapeH - (20 * scale));
+              ctx.shadowBlur = 0;
+            } else if (normDeg % 15 === 0) {
+              // Angka derajat setiap 15°
+              ctx.strokeStyle = "rgba(226, 232, 240, 0.85)";
+              ctx.lineWidth = 1.2 * scale;
+              ctx.beginPath();
+              ctx.moveTo(xPos, tapeY + tapeH);
+              ctx.lineTo(xPos, tapeY + tapeH - (12 * scale));
+              ctx.stroke();
+
+              ctx.fillStyle = "#cbd5e1";
+              ctx.font = `bold ${Math.round(10 * scale)}px monospace`;
+              ctx.textAlign = "center";
+              ctx.shadowColor = "rgba(0, 0, 0, 0.9)";
+              ctx.shadowBlur = 3;
+              ctx.fillText(String(normDeg), xPos, tapeY + tapeH - (14 * scale));
+              ctx.shadowBlur = 0;
+            } else if (normDeg % 5 === 0) {
+              // Garis menengah setiap 5°
+              ctx.strokeStyle = "rgba(255, 255, 255, 0.5)";
+              ctx.lineWidth = 1 * scale;
+              ctx.beginPath();
+              ctx.moveTo(xPos, tapeY + tapeH);
+              ctx.lineTo(xPos, tapeY + tapeH - (7 * scale));
+              ctx.stroke();
+            } else {
+              // Garis mikro per 1°
+              ctx.strokeStyle = "rgba(255, 255, 255, 0.2)";
+              ctx.lineWidth = 0.8 * scale;
+              ctx.beginPath();
+              ctx.moveTo(xPos, tapeY + tapeH);
+              ctx.lineTo(xPos, tapeY + tapeH - (3.5 * scale));
+              ctx.stroke();
+            }
+          }
+          ctx.restore();
+
+          // Jarum penunjuk tengah kompas (Segitiga ▼)
           ctx.beginPath();
-          ctx.moveTo(0, cy);
-          ctx.lineTo(w, cy);
-          ctx.stroke();
-          ctx.setLineDash([]);
+          ctx.moveTo(cx - (7 * scale), tapeY + (4 * scale));
+          ctx.lineTo(cx + (7 * scale), tapeY + (4 * scale));
+          ctx.lineTo(cx, tapeY + (14 * scale));
+          ctx.closePath();
+          ctx.fillStyle = isWestLocked ? "#10b981" : "#38bdf8";
+          ctx.shadowColor = "rgba(0, 0, 0, 0.9)";
+          ctx.shadowBlur = 4;
+          ctx.fill();
+          ctx.shadowBlur = 0;
 
-          ctx.fillStyle = "#38bdf8";
-          ctx.font = "bold 18px sans-serif";
-          ctx.fillText("── Ufuk Hakiki (0.00°) ──", 20, cy - 8);
-
-          const dipY = cy + (h * 0.025);
-          ctx.strokeStyle = "#fbbf24";
-          ctx.lineWidth = 1.5;
-          ctx.setLineDash([6, 6]);
-          ctx.beginPath();
-          ctx.moveTo(0, dipY);
-          ctx.lineTo(w, dipY);
-          ctx.stroke();
-          ctx.setLineDash([]);
-
-          ctx.fillStyle = "#fbbf24";
-          ctx.font = "bold 15px sans-serif";
-          ctx.fillText("── Ufuk Laut Dip (-0.20°) ──", 20, dipY + 20);
-
-          ctx.strokeStyle = "#ef4444";
-          ctx.lineWidth = 2;
-          ctx.beginPath();
-          ctx.moveTo(cx - 20, cy); ctx.lineTo(cx + 20, cy);
-          ctx.moveTo(cx, cy - 20); ctx.lineTo(cx, cy + 20);
-          ctx.stroke();
-
-          ctx.beginPath();
-          ctx.arc(cx, cy, 12, 0, 2 * Math.PI);
-          ctx.strokeStyle = "rgba(255, 255, 255, 0.85)";
-          ctx.stroke();
-
-          ctx.fillStyle = "rgba(15, 23, 42, 0.75)";
-          ctx.fillRect(w / 2 - 150, 14, 300, 38);
-          ctx.strokeStyle = "#38bdf8";
-          ctx.strokeRect(w / 2 - 150, 14, 300, 38);
-
-          ctx.fillStyle = "#ffffff";
-          ctx.font = "bold 15px sans-serif";
+          // Nilai Angka Derajat Utama di Bawah Pita Kompas
+          ctx.fillStyle = isWestLocked ? "#34d399" : "#ffffff";
+          ctx.font = `bold ${Math.round(13 * scale)}px monospace`;
           ctx.textAlign = "center";
-          ctx.fillText("🧭 BIDIKAN BARAT 270.0° • LIVE", w / 2, 38);
-          ctx.textAlign = "left";
+          ctx.shadowColor = "rgba(0, 0, 0, 0.9)";
+          ctx.shadowBlur = 4;
+          const cardName = getCardinalDirection(curAz);
+          const westIcon = isWestLocked ? "🎯 " : "";
+          ctx.fillText(`${westIcon}${curAz.toFixed(1)}° ${cardName}`, cx, tapeY + tapeH + (18 * scale));
+          ctx.shadowBlur = 0;
+
+          // ==========================================================
+          // 2. WATERPASS TENGAH KAMERA HP (PITCH LADDER + GARIS PENDEK)
+          // ==========================================================
+          // Seperti pada kamera handphone: lingkaran dengan garis pendek di tengah.
+          // Saat pas lurus (0.0°), indikator berubah menjadi warna KUNING terang.
+          const R = 42 * scale; // Radius lingkaran bidik tengah
+
+          // A. Lingkaran luar (Center Housing Ring)
+          ctx.beginPath();
+          ctx.arc(cx, cy, R, 0, 2 * Math.PI);
+          ctx.strokeStyle = isLevel ? "#facc15" : "rgba(255, 255, 255, 0.35)";
+          ctx.lineWidth = 1.5 * scale;
+          if (isLevel) {
+            ctx.shadowColor = "rgba(250, 204, 21, 0.85)";
+            ctx.shadowBlur = 8 * scale;
+          }
+          ctx.stroke();
+          ctx.shadowBlur = 0;
+
+          // B. Sayap horizontal luar di kiri (9 o'clock) & kanan (3 o'clock)
+          const wingLen = 14 * scale;
+          ctx.strokeStyle = isLevel ? "#facc15" : "rgba(255, 255, 255, 0.65)";
+          ctx.lineWidth = isLevel ? 2.5 * scale : 1.8 * scale;
+          ctx.beginPath();
+          ctx.moveTo(cx - R - wingLen, cy);
+          ctx.lineTo(cx - R - (2 * scale), cy);
+          ctx.moveTo(cx + R + (2 * scale), cy);
+          ctx.lineTo(cx + R + wingLen, cy);
+          ctx.stroke();
+
+          // C. Tangga tick horizontal (Pitch Ladder Graduations) di dalam lingkaran
+          const ladderSteps = [
+            { dy: -20 * scale, w: 26 * scale },
+            { dy: -10 * scale, w: 16 * scale },
+            { dy: 0,           w: 22 * scale },
+            { dy: 10 * scale,  w: 16 * scale },
+            { dy: 20 * scale,  w: 26 * scale }
+          ];
+          ctx.strokeStyle = "rgba(255, 255, 255, 0.25)";
+          ctx.lineWidth = 1 * scale;
+          for (let step of ladderSteps) {
+            ctx.beginPath();
+            ctx.moveTo(cx - (step.w / 2), cy + step.dy);
+            ctx.lineTo(cx + (step.w / 2), cy + step.dy);
+            ctx.stroke();
+          }
+
+          // D. GARIS VERTIKAL PENDEK DI TENGAH (BERUBAH POSISI SESUAI TILT)
+          // Bergeser naik/turun di dalam lingkaran mengikuti sudut tilt kamera.
+          // Saat pas lurus (0.0°), tepat di tengah dan berubah WARNA KUNING terang.
+          const maxPitch = 24 * scale;
+          const pitchShift = Math.max(-maxPitch, Math.min(maxPitch, curTilt * 3.0 * scale));
+          const markerY = isLevel ? cy : (cy - pitchShift);
+          const vertSegHalfLen = 10 * scale; // Panjang garis pendek ~20px
+
+          const markerColor = isLevel ? "#facc15" : "rgba(255, 255, 255, 0.95)";
+          ctx.strokeStyle = markerColor;
+          ctx.lineWidth = isLevel ? 3 * scale : 2 * scale;
+          if (isLevel) {
+            ctx.shadowColor = "rgba(250, 204, 21, 0.9)";
+            ctx.shadowBlur = 10 * scale;
+          }
+
+          ctx.beginPath();
+          ctx.moveTo(cx, markerY - vertSegHalfLen);
+          ctx.lineTo(cx, markerY + vertSegHalfLen);
+          ctx.stroke();
+
+          // Crossbar horizontal kecil di garis pendek
+          const crossHalf = isLevel ? (7 * scale) : (5 * scale);
+          ctx.beginPath();
+          ctx.moveTo(cx - crossHalf, markerY);
+          ctx.lineTo(cx + crossHalf, markerY);
+          ctx.stroke();
+          ctx.shadowBlur = 0;
+
+          // E. Teks Derajat & Status di Atas Lingkaran
+          ctx.textAlign = "center";
+          ctx.shadowColor = "rgba(0, 0, 0, 0.9)";
+          ctx.shadowBlur = 4;
+          if (isLevel) {
+            ctx.fillStyle = "#facc15";
+            ctx.font = `bold ${Math.round(13 * scale)}px sans-serif`;
+            ctx.fillText("● 0.0° LURUS (LEVEL)", cx, cy - R - (12 * scale));
+          } else {
+            ctx.fillStyle = "#ffffff";
+            ctx.font = `bold ${Math.round(11 * scale)}px monospace`;
+            const tiltDir = curTilt > 0 ? "▼ Turunkan" : "▲ Naikkan";
+            ctx.fillText(`${curTilt > 0 ? "+" : ""}${curTilt.toFixed(1)}° (${tiltDir})`, cx, cy - R - (12 * scale));
+          }
+          ctx.shadowBlur = 0;
         }
       }
 
@@ -1510,6 +1835,11 @@ HTML_TEMPLATE = """
 </body>
 </html>
 """
+
+
+@app.route("/api/compass", methods=["GET"])
+def api_compass():
+    return jsonify(compass_service.get_data())
 
 
 @app.route("/")
