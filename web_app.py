@@ -146,6 +146,183 @@ HTML_TEMPLATE = """
       background-color: #0f172a; margin-bottom: 12px;
     }
     .preview-img { width: 100%; border-radius: 8px; display: none; margin-top: 10px; border: 1px solid #334155; }
+
+    /* 3 Photo Preview Slots */
+    .photo-slots-wrapper {
+      margin-top: 12px;
+      background: #0f172a;
+      border: 1px solid #233147;
+      border-radius: 12px;
+      padding: 12px;
+    }
+    .photo-slots-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    .photo-slots-title {
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: #94a3b8;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .btn-slot-del {
+      background: transparent;
+      color: #ef4444;
+      border: 1px solid rgba(239, 68, 68, 0.35);
+      border-radius: 6px;
+      padding: 3px 10px;
+      font-size: 0.72rem;
+      cursor: pointer;
+      font-weight: 600;
+      transition: 0.15s;
+    }
+    .btn-slot-del:hover {
+      background: rgba(239, 68, 68, 0.15);
+      border-color: #ef4444;
+    }
+    .photo-slots-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+    }
+    .slot-card {
+      position: relative;
+      height: 78px;
+      background: #18202d;
+      border: 1.5px dashed #334155;
+      border-radius: 8px;
+      cursor: pointer;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+      user-select: none;
+    }
+    .slot-card:hover {
+      border-color: #38bdf8;
+      background: #1e293b;
+    }
+    .slot-card.active {
+      border: 2px solid #38bdf8;
+      box-shadow: 0 0 12px rgba(56, 189, 248, 0.4);
+      background: #0d243a;
+    }
+    .slot-card img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .slot-badge-tag {
+      position: absolute;
+      top: 4px;
+      left: 4px;
+      background: rgba(15, 23, 42, 0.85);
+      color: #cbd5e1;
+      font-size: 0.65rem;
+      font-weight: 700;
+      padding: 1px 6px;
+      border-radius: 4px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      z-index: 2;
+    }
+    .slot-card.active .slot-badge-tag {
+      background: #0284c7;
+      color: #ffffff;
+      border-color: #38bdf8;
+    }
+    .slot-empty-body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: #64748b;
+      font-size: 0.70rem;
+      font-weight: 600;
+      gap: 3px;
+    }
+    .slot-empty-icon {
+      font-size: 1.25rem;
+    }
+
+    /* Prominent Objects Pop-up Panel */
+    .prominent-objects-panel {
+      margin-top: 12px;
+      background: #0f172a;
+      border: 1px solid #233147;
+      border-radius: 12px;
+      padding: 12px 14px;
+    }
+    .prominent-objects-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .prominent-title {
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: #38bdf8;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .prominent-sub {
+      font-size: 0.72rem;
+      color: #94a3b8;
+    }
+    .prominent-objects-list {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .prominent-chip {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 6px 12px;
+      color: #e2e8f0;
+      font-size: 0.76rem;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.15s ease;
+    }
+    .prominent-chip:hover {
+      background: #273549;
+      border-color: #38bdf8;
+      color: #ffffff;
+      transform: translateY(-1px);
+    }
+    .prominent-chip.chip-active {
+      background: rgba(2, 132, 199, 0.25);
+      border-color: #38bdf8;
+      box-shadow: 0 0 8px rgba(56, 189, 248, 0.3);
+    }
+    .chip-badge {
+      background: #0284c7;
+      color: #ffffff;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-weight: 700;
+      font-size: 0.68rem;
+    }
+    .chip-angles {
+      font-family: monospace;
+      font-size: 0.78rem;
+    }
+    .chip-angles b {
+      color: #38bdf8;
+    }
     .badge {
       display: inline-block; padding: 4px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: bold;
     }
@@ -550,7 +727,7 @@ HTML_TEMPLATE = """
             </button>
           </div>
 
-          <input type="file" id="galleryInput" accept="image/*" style="display: none;" onchange="onFileSelected(this)">
+          <input type="file" id="galleryInput" accept="image/*" multiple style="display: none;" onchange="onFileSelected(this)">
 
           <div id="liveCamWrapper">
             <!-- Pilihan Sumber Perangkat Kamera -->
@@ -576,6 +753,11 @@ HTML_TEMPLATE = """
             </div>
 
             <!-- Frame Viewport Kamera Mandiri (Overlay Canvas Terkunci di Dalam Frame Video) -->
+            <div id="liveSensorBanner" style="padding: 7px 12px; margin-bottom: 10px; border-radius: 8px; font-size: 0.78rem; display: flex; align-items: center; justify-content: space-between; background: #1e293b; border: 1px solid #334155; color: #94a3b8;">
+              <span id="sensorBannerText">🧭 Memeriksa koneksi sensor hardware...</span>
+              <span id="sensorBannerCalib" style="font-size: 0.72rem; color: #64748b;"></span>
+            </div>
+
             <div class="cam-viewport-box">
               <video id="cameraVideo" playsinline autoplay muted></video>
               <canvas id="cameraOverlay"></canvas>
@@ -601,6 +783,40 @@ HTML_TEMPLATE = """
           </div>
 
           <img id="rawPreview" class="preview-img" alt="Preview Foto Aktif">
+
+          <!-- PREVIEW 3 FOTO (SLOT FOTO & PILIHAN FOTO) -->
+          <div class="photo-slots-wrapper">
+            <div class="photo-slots-header">
+              <span class="photo-slots-title">🖼️ Pilihan 3 Foto (Klik slot untuk memilih foto aktif):</span>
+              <button type="button" class="btn-slot-del" onclick="deleteActivePhotoSlot()" title="Hapus foto pada slot terpilih">🗑️ Hapus Foto</button>
+            </div>
+            <div class="photo-slots-grid">
+              <div class="slot-card active" id="slotCard0" onclick="selectPhotoSlot(0)">
+                <span class="slot-badge-tag" id="slotBadge0">Slot 1</span>
+                <div class="slot-empty-body" id="slotEmpty0">
+                  <span class="slot-empty-icon">📷</span>
+                  <span>Slot 1</span>
+                </div>
+                <img id="slotImg0" style="display: none;" alt="Slot 1">
+              </div>
+              <div class="slot-card" id="slotCard1" onclick="selectPhotoSlot(1)">
+                <span class="slot-badge-tag" id="slotBadge1">Slot 2</span>
+                <div class="slot-empty-body" id="slotEmpty1">
+                  <span class="slot-empty-icon">📷</span>
+                  <span>Slot 2</span>
+                </div>
+                <img id="slotImg1" style="display: none;" alt="Slot 2">
+              </div>
+              <div class="slot-card" id="slotCard2" onclick="selectPhotoSlot(2)">
+                <span class="slot-badge-tag" id="slotBadge2">Slot 3</span>
+                <div class="slot-empty-body" id="slotEmpty2">
+                  <span class="slot-empty-icon">📷</span>
+                  <span>Slot 3</span>
+                </div>
+                <img id="slotImg2" style="display: none;" alt="Slot 3">
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- KARTU 2: PARAMETER BIDIKAN & SENSOR -->
@@ -709,6 +925,15 @@ HTML_TEMPLATE = """
               <div class="interactive-hint-badge">
                 <span>👆 Sentuh/Geser Titik Azimut di Gambar &bull; 🤏 2 Jari / Scroll untuk Zoom & Pan</span>
               </div>
+            </div>
+
+            <!-- POP UP / CHIPS OBJEK MENONJOL (ANGKA DERAJAT HORIZONTAL & VERTIKAL) -->
+            <div id="prominentObjectsContainer" class="prominent-objects-panel" style="display: none;">
+              <div class="prominent-objects-header">
+                <span class="prominent-title">📍 Objek Menonjol Terdeteksi (Pop-up Derajat Horisontal &amp; Vertikal):</span>
+                <span class="prominent-sub">Klik objek untuk bidik langsung</span>
+              </div>
+              <div id="prominentObjectsList" class="prominent-objects-list"></div>
             </div>
           </div>
 
@@ -921,6 +1146,10 @@ HTML_TEMPLATE = """
     let liveCompassConnected = false;
     let liveCompassAzimuth = 270.0;
     let liveCompassTilt = 0.0;
+    let liveCompassStatus = "";
+    let liveCompassPort = "";
+    let liveCompassMag = 0;
+    let liveCompassGyro = 0;
 
     function getCardinalDirection(deg) {
       deg = ((deg % 360) + 360) % 360;
@@ -940,11 +1169,17 @@ HTML_TEMPLATE = """
         if (!res.ok) return;
         const data = await res.json();
         const badge = document.getElementById('compassLiveBadge');
-        const topDot = document.getElementById('topHudDot');
-        const topMsg = document.getElementById('topHudStatusMsg');
+        const banner = document.getElementById('liveSensorBanner');
+        const bannerText = document.getElementById('sensorBannerText');
+        const bannerCalib = document.getElementById('sensorBannerCalib');
+
+        liveCompassConnected = Boolean(data.connected);
+        liveCompassStatus = data.status || "";
+        liveCompassPort = data.port || "";
+        liveCompassMag = data.cal_mag || 0;
+        liveCompassGyro = data.cal_gyro || 0;
 
         if (data.connected) {
-          liveCompassConnected = true;
           liveCompassAzimuth = (data.azimuth !== undefined && data.azimuth !== null) ? Number(data.azimuth) : 270.0;
           liveCompassTilt = (data.tilt !== undefined && data.tilt !== null) ? Number(data.tilt) : 0.0;
           const azInp = document.getElementById('inpAzimuth');
@@ -959,11 +1194,15 @@ HTML_TEMPLATE = """
           const isWest = Math.abs(liveCompassAzimuth - 270.0) <= 2.5;
           const cardName = getCardinalDirection(liveCompassAzimuth);
 
-          if (topDot) topDot.className = "status-indicator-dot active";
-          if (topMsg) {
-            topMsg.innerHTML = isWest
-              ? '<span style="color:#34d399; font-weight:800;">🎯 ' + (data.port || 'COM7') + ' (KUNCI BARAT)</span>'
-              : `<span>🟢 ${data.port || 'COM7'} Aktif</span>`;
+          if (banner) {
+            banner.style.background = isWest ? 'rgba(6, 78, 59, 0.4)' : 'rgba(14, 116, 144, 0.25)';
+            banner.style.borderColor = isWest ? '#10b981' : '#0284c7';
+          }
+          if (bannerText) {
+            bannerText.innerHTML = `<b style="color:${isWest ? '#34d399' : '#38bdf8'}">🟢 ${data.port || 'COM'} TERHUBUNG:</b> ${liveCompassAzimuth.toFixed(1)}° (${cardName}) | Tilt ${liveCompassTilt > 0 ? '+' : ''}${liveCompassTilt.toFixed(1)}°`;
+          }
+          if (bannerCalib) {
+            bannerCalib.innerHTML = `<span style="color:#facc15">Mag: ${data.cal_mag || 0}/3</span> | <span style="color:#38bdf8">Gyro: ${data.cal_gyro || 0}/3</span>`;
           }
 
           if (badge) {
@@ -974,12 +1213,23 @@ HTML_TEMPLATE = """
               '<span style="color: #94a3b8; font-size: 0.72rem;">Mag: ' + (data.cal_mag || 0) + '/3 | Gyro: ' + (data.cal_gyro || 0) + '/3</span>';
           }
         } else {
-          liveCompassConnected = false;
-          if (topDot) topDot.className = "status-indicator-dot";
-          if (topMsg) topMsg.innerText = "⚠️ " + (data.status || "Sensor terputus");
+          const isBusy = (data.status || '').includes('sibuk') || (data.status || '').includes('terkunci');
+          if (banner) {
+            banner.style.background = isBusy ? 'rgba(153, 27, 27, 0.35)' : 'rgba(30, 41, 59, 0.6)';
+            banner.style.borderColor = isBusy ? '#ef4444' : '#475569';
+          }
+          if (bannerText) {
+            bannerText.innerHTML = isBusy 
+              ? `<b style="color:#f87171">⚠️ ${data.status}</b>` 
+              : `<span style="color: #94a3b8;">⚠️ ${data.status || 'Sensor terputus'}</span>`;
+          }
+          if (bannerCalib) {
+            bannerCalib.innerHTML = isBusy ? '<span style="color:#fca5a5; font-size: 0.72rem;">(Tutup window Serial Monitor)</span>' : '';
+          }
+
           if (badge) {
-            badge.style.borderColor = '#334155';
-            badge.innerHTML = '<span style="color: #94a3b8;">⚠️ ' + (data.status || 'Kompas tidak terdeteksi') + '</span>';
+            badge.style.borderColor = isBusy ? '#ef4444' : '#334155';
+            badge.innerHTML = '<span style="color: ' + (isBusy ? '#f87171' : '#94a3b8') + ';">⚠️ ' + (data.status || 'Kompas tidak terdeteksi') + '</span>';
           }
         }
       } catch (err) {}
@@ -1011,13 +1261,112 @@ HTML_TEMPLATE = """
       return sign + String(d).padStart(2, '0') + "° " + String(m).padStart(2, '0') + "' " + String(s).padStart(4, '0') + '"';
     }
 
-    // Tampilkan foto langsung ke preview saat dipilih, dan kompresi latar belakang
-    function compressAndSetImage(file, statusText) {
+    // Pengelolaan 3 Slot Foto & Pilihan Foto
+    let photoSlots = [null, null, null];
+    let activeSlotIndex = 0;
+
+    function updatePhotoSlotsUI() {
+      for (let i = 0; i < 3; i++) {
+        const card = document.getElementById('slotCard' + i);
+        const img = document.getElementById('slotImg' + i);
+        const empty = document.getElementById('slotEmpty' + i);
+        const badge = document.getElementById('slotBadge' + i);
+        if (!card) continue;
+
+        if (i === activeSlotIndex) {
+          card.classList.add('active');
+        } else {
+          card.classList.remove('active');
+        }
+
+        if (photoSlots[i] && photoSlots[i].b64) {
+          img.src = photoSlots[i].b64;
+          img.style.display = 'block';
+          if (empty) empty.style.display = 'none';
+          if (badge) badge.innerText = `Slot ${i + 1}`;
+        } else {
+          img.src = '';
+          img.style.display = 'none';
+          if (empty) empty.style.display = 'flex';
+          if (badge) badge.innerText = `Slot ${i + 1} (Kosong)`;
+        }
+      }
+
+      // Perbarui preview foto utama
+      const preview = document.getElementById('rawPreview');
+      const dropArea = document.getElementById('dropArea');
+      const lblStatus = document.getElementById('lblPhotoStatus');
+      const activeSlot = photoSlots[activeSlotIndex];
+
+      if (activeSlot && activeSlot.b64) {
+        selectedImageBase64 = activeSlot.b64;
+        if (preview) {
+          preview.src = activeSlot.b64;
+          preview.style.display = 'block';
+        }
+        if (dropArea) dropArea.classList.add('active');
+        if (lblStatus) {
+          lblStatus.innerText = `Slot ${activeSlotIndex + 1} Terpilih: ${activeSlot.status || 'Foto Siap Diproses'}`;
+          lblStatus.style.color = '#10b981';
+        }
+      } else {
+        selectedImageBase64 = null;
+        if (preview) {
+          preview.src = '';
+          preview.style.display = 'none';
+        }
+        if (dropArea) dropArea.classList.remove('active');
+        if (lblStatus) {
+          lblStatus.innerText = `Slot ${activeSlotIndex + 1} kosong - Silakan pilih / muat foto`;
+          lblStatus.style.color = '#38bdf8';
+        }
+      }
+    }
+
+    function selectPhotoSlot(idx) {
+      if (idx < 0 || idx >= 3) return;
+      activeSlotIndex = idx;
+      if (!photoSlots[idx] || !photoSlots[idx].b64) {
+        // Jika slot masih kosong, langsung buka dialog pemilihan file untuk mengisi slot ini
+        document.getElementById('galleryInput').click();
+      } else {
+        updatePhotoSlotsUI();
+      }
+    }
+
+    function deleteActivePhotoSlot() {
+      if (!photoSlots[activeSlotIndex]) {
+        alert("Slot " + (activeSlotIndex + 1) + " memang masih kosong.");
+        return;
+      }
+      photoSlots[activeSlotIndex] = null;
+      // Otomatis pindah ke slot lain yang masih terisi jika ada
+      let nextIdx = photoSlots.findIndex(s => s && s.b64);
+      if (nextIdx !== -1) {
+        activeSlotIndex = nextIdx;
+      }
+      updatePhotoSlotsUI();
+    }
+
+    function setPhotoToSlot(slotIdx, b64, statusText) {
+      photoSlots[slotIdx] = {
+        b64: b64,
+        status: statusText || ("Foto Slot " + (slotIdx + 1))
+      };
+      activeSlotIndex = slotIdx;
+      updatePhotoSlotsUI();
+    }
+
+    function displayLoadedImage(b64, statusText) {
+      setPhotoToSlot(activeSlotIndex, b64, statusText);
+      stopLiveCamera();
+    }
+
+    function compressAndSetImage(file, targetSlot, statusText) {
       const reader = new FileReader();
       reader.onload = function(e) {
         const dataUrl = e.target.result;
-        selectedImageBase64 = dataUrl;
-        displayLoadedImage(dataUrl, statusText);
+        setPhotoToSlot(targetSlot, dataUrl, statusText);
 
         // Kompresi latar belakang jika resolusi foto sangat besar (misal 12-48 MP kamera HP)
         const img = new Image();
@@ -1038,7 +1387,17 @@ HTML_TEMPLATE = """
             canvas.height = h;
             const ctx = canvas.getContext('2d');
             ctx.drawImage(img, 0, 0, w, h);
-            selectedImageBase64 = canvas.toDataURL('image/jpeg', 0.86);
+            const compressed = canvas.toDataURL('image/jpeg', 0.86);
+            if (photoSlots[targetSlot]) {
+              photoSlots[targetSlot].b64 = compressed;
+              if (activeSlotIndex === targetSlot) {
+                selectedImageBase64 = compressed;
+                const prev = document.getElementById('rawPreview');
+                if (prev) prev.src = compressed;
+              }
+              const slotImg = document.getElementById('slotImg' + targetSlot);
+              if (slotImg) slotImg.src = compressed;
+            }
           }
         };
         img.src = dataUrl;
@@ -1047,34 +1406,83 @@ HTML_TEMPLATE = """
     }
 
     function onFileSelected(input) {
-      if (input.files && input.files[0]) {
+      if (input.files && input.files.length > 0) {
+        const files = Array.from(input.files).slice(0, 3);
         const sourceName = input.id === 'galleryInput' ? 'Penyimpanan Berkas' : 'Kamera / Webcam';
-        compressAndSetImage(input.files[0], "Foto siap dari " + sourceName);
-        input.value = "";
-      }
-    }
 
-    function displayLoadedImage(b64, statusText) {
-      const preview = document.getElementById('rawPreview');
-      preview.src = b64;
-      preview.style.display = 'block';
-      const dropArea = document.getElementById('dropArea');
-      if (dropArea) dropArea.classList.add('active');
-      document.getElementById('lblPhotoStatus').innerText = statusText || "Foto Terpilih";
-      document.getElementById('lblPhotoStatus').style.color = "#10b981";
-      stopLiveCamera();
+        files.forEach((file, fIdx) => {
+          let slotTarget = activeSlotIndex;
+          if (fIdx > 0) {
+            const emptyIdx = photoSlots.findIndex((s, idx) => (!s || !s.b64) && idx !== activeSlotIndex);
+            if (emptyIdx !== -1) {
+              slotTarget = emptyIdx;
+            } else {
+              slotTarget = (activeSlotIndex + fIdx) % 3;
+            }
+          }
+          compressAndSetImage(file, slotTarget, file.name || ("Foto " + sourceName));
+        });
+        input.value = "";
+        stopLiveCamera();
+      }
     }
 
     function loadSamplePhoto() {
       fetch('/api/sample_image')
         .then(res => res.json())
         .then(data => {
-          selectedImageBase64 = data.image_base64;
-          displayLoadedImage(selectedImageBase64, "Foto contoh lanskap ufuk terpasang");
+          setPhotoToSlot(activeSlotIndex, data.image_base64, "Foto contoh lanskap ufuk terpasang");
         })
         .catch(err => {
           alert("Gagal memuat contoh foto: " + err.message);
         });
+    }
+
+    // Render pop up chips objek menonjol (angka derajat horizontal dan vertikal)
+    function renderProminentObjects(objects) {
+      const container = document.getElementById('prominentObjectsContainer');
+      const list = document.getElementById('prominentObjectsList');
+      if (!container || !list) return;
+
+      if (!objects || objects.length === 0) {
+        container.style.display = 'none';
+        list.innerHTML = '';
+        return;
+      }
+
+      container.style.display = 'block';
+      list.innerHTML = '';
+      objects.forEach(obj => {
+        const chip = document.createElement('button');
+        chip.type = 'button';
+        chip.className = 'prominent-chip';
+        chip.dataset.az = obj.azimuth.toFixed(2);
+        chip.title = `Bidik langsung ${obj.label}: Azimut ${obj.azimuth.toFixed(2)}°, Elevasi ${obj.elevation >= 0 ? '+' : ''}${obj.elevation.toFixed(2)}°`;
+        chip.innerHTML = `
+          <span class="chip-badge">${obj.label}</span>
+          <span class="chip-angles">H (Az): <b>${obj.azimuth.toFixed(2)}°</b> | V (Alt): <b>${(obj.elevation >= 0 ? '+' : '') + obj.elevation.toFixed(2)}°</b></span>
+        `;
+        chip.onclick = function() {
+          jumpToAzimuth(obj.azimuth);
+        };
+        list.appendChild(chip);
+      });
+    }
+
+    function jumpToAzimuth(azVal) {
+      const slider = document.getElementById('sliderAz');
+      if (slider) {
+        slider.value = azVal.toFixed(2);
+      }
+      onSliderTargetChanged(azVal);
+      // Tandai visual chip yang aktif
+      document.querySelectorAll('.prominent-chip').forEach(btn => {
+        if (Math.abs(parseFloat(btn.dataset.az) - azVal) < 0.15) {
+          btn.classList.add('chip-active');
+        } else {
+          btn.classList.remove('chip-active');
+        }
+      });
     }
 
     let currentCameraDeviceId = null;
@@ -1095,24 +1503,53 @@ HTML_TEMPLATE = """
         if (videoDevices.length === 0) return;
 
         sel.innerHTML = "";
+        let autoPickIdx = -1;
+
         videoDevices.forEach((dev, idx) => {
           const opt = document.createElement('option');
           opt.value = dev.deviceId;
           let label = dev.label || `Kamera ${idx + 1}`;
-          if (/iriun/i.test(label)) label = "📱 " + label + " (Kamera HP)";
-          else if (/droid/i.test(label)) label = "📱 " + label + " (Kamera HP)";
-          else if (/camo|epoc/i.test(label)) label = "📱 " + label + " (Kamera HP)";
-          else if (/integrated|built-in/i.test(label)) label = "💻 " + label + " (Webcam Laptop)";
-          else if (/usb/i.test(label)) label = "🔭 " + label + " (USB/Teleskop)";
+
+          const isLogi = /logi|c270|c920|c922|brio/i.test(label);
+          const isIriun = /iriun/i.test(label);
+          const isDroid = /droid/i.test(label);
+          const isCamo = /camo|epoc/i.test(label);
+          const isInternal = /integrated|built-in|pc camera/i.test(label);
+          const isUsb = /usb/i.test(label);
+
+          if (isLogi) {
+            label = "🎥 " + label + " (Logitech Eksternal HD)";
+            if (autoPickIdx === -1) autoPickIdx = idx;
+          } else if (isUsb && !isInternal) {
+            label = "🔭 " + label + " (USB Eksternal / Teleskop)";
+            if (autoPickIdx === -1) autoPickIdx = idx;
+          } else if (isIriun || isDroid || isCamo) {
+            label = "📱 " + label + " (Kamera HP)";
+          } else if (isInternal) {
+            label = "💻 " + label + " (Webcam Laptop)";
+          }
+
           opt.text = label;
           if (currentCameraDeviceId && dev.deviceId === currentCameraDeviceId) {
             opt.selected = true;
           }
           sel.appendChild(opt);
         });
+
+        // Otomatis prioritaskan Logitech / USB eksternal jika pengguna belum memilih kamera tertentu
+        if (!currentCameraDeviceId && autoPickIdx !== -1) {
+          sel.selectedIndex = autoPickIdx;
+          currentCameraDeviceId = videoDevices[autoPickIdx].deviceId;
+        }
       } catch (e) {
         console.warn("Gagal membaca daftar kamera:", e);
       }
+    }
+
+    if (navigator.mediaDevices && typeof navigator.mediaDevices.addEventListener === 'function') {
+      navigator.mediaDevices.addEventListener('devicechange', async () => {
+        await updateCameraDeviceList();
+      });
     }
 
     async function onCameraDeviceSelected(deviceId) {
@@ -1132,10 +1569,23 @@ HTML_TEMPLATE = """
       document.body.classList.add('camera-live-active');
 
       try {
+        // Jika belum ada kamera terpilih, cari kamera eksternal (Logitech/USB) terlebih dahulu
+        if (!preferredDeviceId && !currentCameraDeviceId && navigator.mediaDevices.enumerateDevices) {
+          try {
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            const videoDevices = devices.filter(d => d.kind === 'videoinput');
+            const extCam = videoDevices.find(d => /logi|c270|c920|c922|brio|usb/i.test(d.label) && !/integrated|built-in|pc camera/i.test(d.label));
+            if (extCam && extCam.deviceId) {
+              currentCameraDeviceId = extCam.deviceId;
+            }
+          } catch (e) {}
+        }
+
         const targetId = preferredDeviceId || currentCameraDeviceId;
         const videoConstraints = {
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
+          width: { ideal: 1280, min: 640 },
+          height: { ideal: 720, min: 480 },
+          frameRate: { ideal: 30, max: 30 }
         };
         if (targetId) {
           videoConstraints.deviceId = { exact: targetId };
@@ -1154,7 +1604,7 @@ HTML_TEMPLATE = """
           updateCameraDeviceList();
         };
       } catch (err) {
-        alert("Tidak dapat membuka kamera: " + err.message + ". Pastikan izin kamera browser diaktifkan atau aplikasi webcam (Iriun/DroidCam) sudah berjalan.");
+        alert("Tidak dapat membuka kamera: " + err.message + ". Pastikan izin kamera browser diaktifkan atau kamera tidak sedang dipakai aplikasi lain.");
         wrapper.style.display = 'none';
         document.body.classList.remove('camera-live-active');
       }
@@ -1422,6 +1872,55 @@ HTML_TEMPLATE = """
             ctx.fillText(`${curTilt > 0 ? "+" : ""}${curTilt.toFixed(1)}° (${tiltDir})`, cx, cy - R - (12 * scale));
           }
           ctx.shadowBlur = 0;
+
+          // F. Status Sensor Hardware Badge di Pojok Kiri Atas Kamera
+          ctx.save();
+          ctx.font = `bold ${Math.round(10 * scale)}px sans-serif`;
+          let hudStatusText = "";
+          let hudStatusBg = "rgba(15, 23, 42, 0.75)";
+          let hudBorder = "#334155";
+          let hudColor = "#94a3b8";
+
+          if (liveCompassConnected) {
+            hudStatusText = `🟢 ${liveCompassPort} LIVE | Mag: ${liveCompassMag}/3 | Gyro: ${liveCompassGyro}/3`;
+            hudStatusBg = "rgba(6, 78, 59, 0.85)";
+            hudBorder = "#10b981";
+            hudColor = "#6ee7b7";
+          } else if (liveCompassStatus.includes("sibuk") || liveCompassStatus.includes("terkunci")) {
+            hudStatusText = `⚠️ TUTUP SERIAL MONITOR ARDUINO (${liveCompassPort || "COM5"} TERKUNCI)`;
+            hudStatusBg = "rgba(153, 27, 27, 0.9)";
+            hudBorder = "#ef4444";
+            hudColor = "#fecaca";
+          } else {
+            hudStatusText = `⚠️ SENSOR OFF: ${liveCompassStatus || "Tidak terdeteksi"}`;
+            hudStatusBg = "rgba(30, 41, 59, 0.8)";
+            hudBorder = "#475569";
+            hudColor = "#cbd5e1";
+          }
+
+          const txtMetrics = ctx.measureText(hudStatusText);
+          const padX = 8 * scale;
+          const boxW = txtMetrics.width + (padX * 2);
+          const boxH = 20 * scale;
+          const boxX = 12 * scale;
+          const boxY = 12 * scale;
+
+          ctx.fillStyle = hudStatusBg;
+          ctx.strokeStyle = hudBorder;
+          ctx.lineWidth = 1 * scale;
+          ctx.beginPath();
+          if (ctx.roundRect) {
+            ctx.roundRect(boxX, boxY, boxW, boxH, 4 * scale);
+          } else {
+            ctx.rect(boxX, boxY, boxW, boxH);
+          }
+          ctx.fill();
+          ctx.stroke();
+
+          ctx.fillStyle = hudColor;
+          ctx.textAlign = "left";
+          ctx.fillText(hudStatusText, boxX + padX, boxY + (14 * scale));
+          ctx.restore();
         }
       }
 
@@ -1438,8 +1937,9 @@ HTML_TEMPLATE = """
       const ctx = hiddenCanvas.getContext('2d');
       ctx.drawImage(video, 0, 0, hiddenCanvas.width, hiddenCanvas.height);
 
-      selectedImageBase64 = hiddenCanvas.toDataURL('image/jpeg', 0.86);
-      displayLoadedImage(selectedImageBase64, "Foto berhasil dipotret dari Kamera Live");
+      const b64 = hiddenCanvas.toDataURL('image/jpeg', 0.86);
+      setPhotoToSlot(activeSlotIndex, b64, "Jepretan Kamera Live");
+      stopLiveCamera();
     }
 
     function getGPS() {
@@ -1518,6 +2018,9 @@ HTML_TEMPLATE = """
         if (document.getElementById('lblMaxAz')) document.getElementById('lblMaxAz').innerText = data.az_max.toFixed(1) + "°";
 
         updateTargetDisplay(payload.azimuth, data.target_analysis);
+        if (data.prominent_objects) {
+          renderProminentObjects(data.prominent_objects);
+        }
 
         if (document.getElementById('rightPlaceholder')) {
           document.getElementById('rightPlaceholder').style.display = 'none';
@@ -1588,6 +2091,9 @@ HTML_TEMPLATE = """
             const elPlot = document.getElementById('resPlotImg');
             if (elPlot) elPlot.src = data.plot_base64;
             document.getElementById('resOverlayImg').src = data.overlay_base64;
+            if (data.prominent_objects) {
+              renderProminentObjects(data.prominent_objects);
+            }
           }
         });
       }, 90);
@@ -2060,6 +2566,9 @@ HTML_TEMPLATE = """
 
     document.addEventListener('DOMContentLoaded', function() {
       initInteractiveImage();
+      updatePhotoSlotsUI();
+      // Muat foto contoh ke Slot 1 saat awal dibuka
+      loadSamplePhoto();
     });
   </script>
 </body>
@@ -2226,7 +2735,9 @@ def api_analyze():
         az_center=azimuth,
         hfov=15.0,
         vfov=8.5,
-        tilt_center=tilt
+        tilt_center=tilt,
+        prominent_obstacles=profile_data.get("prominent_obstacles", []),
+        show_prominent_peaks=True,
     )
 
     _, ov_buf = cv2.imencode(".jpg", overlay_bgr, [int(cv2.IMWRITE_JPEG_QUALITY), 82])
@@ -2264,7 +2775,8 @@ def api_analyze():
         "az_min": float(az_arr[0]),
         "az_max": float(az_arr[-1]),
         "target_analysis": target_analysis,
-        "profile_curve": profile_curve
+        "profile_curve": profile_curve,
+        "prominent_objects": profile_data.get("prominent_obstacles", []),
     })
 
 
@@ -2297,7 +2809,9 @@ def api_recalculate_target():
         az_center=LAST_ANALYSIS["azimuth"],
         hfov=15.0,
         vfov=8.5,
-        tilt_center=LAST_ANALYSIS["tilt"]
+        tilt_center=LAST_ANALYSIS["tilt"],
+        prominent_obstacles=prof.get("prominent_obstacles", []),
+        show_prominent_peaks=True,
     )
     _, ov_buf = cv2.imencode(".jpg", overlay_bgr, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
     overlay_b64 = "data:image/jpeg;base64," + base64.b64encode(ov_buf).decode("utf-8")
@@ -2311,7 +2825,8 @@ def api_recalculate_target():
         "success": True,
         "overlay_base64": overlay_b64,
         "plot_base64": plot_b64,
-        "target_analysis": target_analysis
+        "target_analysis": target_analysis,
+        "prominent_objects": prof.get("prominent_obstacles", []),
     })
 
 
@@ -2453,10 +2968,23 @@ def api_download_excel():
 
 
 def main():
+    import socket
+    lan_ip = "127.0.0.1"
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        lan_ip = s.getsockname()[0]
+        s.close()
+    except Exception:
+        try:
+            lan_ip = socket.gethostbyname(socket.gethostname())
+        except Exception:
+            pass
+
     print("=" * 60)
     print("   APLIKASI PEMETAAN UFUK MAR'I (EDISI LAPTOP & DESKTOP)")
     print("   Buka dari Browser Laptop : http://127.0.0.1:5000")
-    print("   Buka dari Jaringan Lokal : http://192.168.x.x:5000")
+    print(f"   Buka dari HP / WiFi Lain  : http://{lan_ip}:5000")
     print("=" * 60)
     app.run(host="0.0.0.0", port=5000, debug=False, threaded=True)
 

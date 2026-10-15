@@ -5,7 +5,7 @@ Mengidentifikasi batas pertemuan langit (sky) dan daratan/halangan (ground/terra
 per kolom horizontal, mengonversi ke profil elevasi sudut astronomi.
 """
 
-from typing import Tuple, Dict, Any, Optional
+from typing import Tuple, Dict, Any, Optional, List
 from itertools import groupby
 from operator import itemgetter
 import numpy as np
@@ -387,6 +387,14 @@ class HorizonDetector:
 
         dip_deg, dip_arcmin = calculate_dip(elevation_m)
 
+        prominent_obstacles = self.detect_prominent_obstacles(
+            elevations=elevations,
+            azimuths=azimuths,
+            horizon_y=horizon_y,
+            img_w=img_w,
+            img_h=img_h,
+        )
+
         min_idx = int(np.argmin(elevations))
         max_idx = int(np.argmax(elevations))
 
@@ -400,6 +408,7 @@ class HorizonDetector:
             "az_range_max": float(azimuths[-1]),
             "hfov": hfov,
             "vfov": vfov if vfov is not None else float(np.ptp(elevations)),
+            "prominent_count": len(prominent_obstacles),
         }
 
         self.last_azimuths = azimuths
@@ -411,6 +420,7 @@ class HorizonDetector:
             "horizon_y": horizon_y,
             "dip_deg": dip_deg,
             "dip_arcmin": dip_arcmin,
+            "prominent_obstacles": prominent_obstacles,
             "stats": stats,
             "img_w": img_w,
             "img_h": img_h,
@@ -420,6 +430,60 @@ class HorizonDetector:
             "tilt_center": tilt_center,
             "elevation_m": elevation_m,
         }
+
+    def detect_prominent_obstacles(
+        self,
+        elevations: np.ndarray,
+        azimuths: np.ndarray,
+        horizon_y: np.ndarray,
+        img_w: int,
+        img_h: int,
+        min_prominence: float = 0.10,
+        max_peaks: int = 5,
+    ) -> List[Dict[str, Any]]:
+        """
+        Mendeteksi objek-objek rintangan yang menonjol di atas garis ufuk mar'i
+        (misal menara pemancar, puncak bukit, gedung, atau pohon tinggi).
+        
+        Mengembalikan daftar objek dengan koordinat piksel (x, y) serta
+        sudut astronomis:
+        - Derajat Horizontal (Azimuth dalam derajat)
+        - Derajat Vertikal (Elevasi / Altitudo dalam derajat)
+        - Nilai prominensi / kenaikan tinggi relatif
+        """
+        from scipy.signal import find_peaks
+
+        min_dist = max(15, img_w // 28)
+        peaks, props = find_peaks(elevations, prominence=min_prominence, distance=min_dist)
+        if len(peaks) == 0 and min_prominence > 0.05:
+            peaks, props = find_peaks(elevations, prominence=0.05, distance=min_dist)
+
+        if len(peaks) == 0:
+            return []
+
+        proms = props.get("prominences", np.zeros(len(peaks)))
+        top_indices = np.argsort(proms)[::-1][:max_peaks]
+        top_peaks = sorted(peaks[top_indices])
+
+        obstacles = []
+        for i, px in enumerate(top_peaks):
+            pos = np.where(peaks == px)[0]
+            prom_val = float(proms[pos[0]]) if len(pos) > 0 else 0.0
+            py = float(horizon_y[px])
+            az = float(azimuths[px])
+            alt = float(elevations[px])
+            obstacles.append({
+                "id": i + 1,
+                "x": int(px),
+                "y": int(round(py)),
+                "azimuth": round(az, 2),
+                "elevation": round(alt, 2),
+                "prominence": round(prom_val, 2),
+                "label": f"Objek {i + 1}",
+                "text": f"Objek {i + 1}: Az {az:.2f} deg | Alt {alt:+.2f} deg",
+                "short_text": f"Az {az:.2f}°, Alt {alt:+.2f}°",
+            })
+        return obstacles
 
     def render_overlay(
         self,
@@ -436,6 +500,8 @@ class HorizonDetector:
         hfov: float = 15.0,
         vfov: Optional[float] = None,
         tilt_center: float = 0.0,
+        prominent_obstacles: Optional[List[Dict[str, Any]]] = None,
+        show_prominent_peaks: bool = True,
     ) -> np.ndarray:
         """
         Merender kontur ufuk mar'i dan garis referensi astronomi pada gambar.
@@ -496,7 +562,64 @@ class HorizonDetector:
         # Garis kontur kuning neon terang
         cv2.polylines(canvas, [pts], isClosed=False, color=(0, 255, 255), thickness=line_thick, lineType=cv2.LINE_AA)
 
-        # 4. Kursor Azimut Sasaran (Target Azimuth Line & Marker)
+        # 4. Anotasi Popup Objek Menonjol (Prominent Obstacles / Peaks)
+        # Menampilkan penanda dan pop up angka derajat horizontal & vertikal pada objek yang menonjol
+        if show_prominent_peaks and elevations is not None and azimuths is not None:
+            if prominent_obstacles is None:
+                prominent_obstacles = self.detect_prominent_obstacles(
+                    elevations=elevations,
+                    azimuths=azimuths,
+                    horizon_y=horizon_y,
+                    img_w=w,
+                    img_h=h,
+                )
+
+            for i, obs in enumerate(prominent_obstacles):
+                px = obs["x"]
+                py = obs["y"]
+                az_val = obs["azimuth"]
+                alt_val = obs["elevation"]
+                obj_id = obs.get("id", i + 1)
+
+                # Cek kedekatan dengan target_x agar kotak tidak bertumpuk
+                near_target = (target_x is not None) and (abs(px - target_x) < 45)
+
+                txt = f"Objek {obj_id}: Az {az_val:.2f} deg | Alt {alt_val:+.2f} deg"
+                font = cv2.FONT_HERSHEY_SIMPLEX
+                font_scale = 0.40
+                thick = 1
+                (tw, th), baseline = cv2.getTextSize(txt, font, font_scale, thick)
+                pad_x, pad_y = 7, 5
+                box_w = tw + pad_x * 2
+                box_h = th + pad_y * 2 + baseline
+
+                # Variasi ketinggian stem agar popup objek berdekatan tidak tumpang-tindih
+                stem_len = 24 + ((i + (1 if near_target else 0)) % 2) * 26
+                box_y = py - stem_len - box_h
+                if box_y < 12:
+                    box_y = min(h - box_h - 10, py + 18)
+                box_x = int(px - box_w / 2)
+                box_x = max(8, min(w - box_w - 8, box_x))
+
+                # Garis vertikal penunjuk dari pucuk objek ke kotak popup
+                stem_top = box_y + box_h if box_y < py else box_y
+                stem_color = (0, 220, 255)  # Kuning-amber terang
+                cv2.line(canvas, (px, py), (px, stem_top), stem_color, 1, cv2.LINE_AA)
+
+                # Titik penanda pucuk objek
+                cv2.circle(canvas, (px, py), 5, (0, 0, 0), -1, cv2.LINE_AA)
+                cv2.circle(canvas, (px, py), 4, stem_color, -1, cv2.LINE_AA)
+                cv2.circle(canvas, (px, py), 2, (255, 255, 255), -1, cv2.LINE_AA)
+
+                # Kotak popup latar belakang gelap berbingkai cyan modern
+                cv2.rectangle(canvas, (box_x, box_y), (box_x + box_w, box_y + box_h), (15, 23, 42), -1)
+                cv2.rectangle(canvas, (box_x, box_y), (box_x + box_w, box_y + box_h), (56, 189, 248), 1, cv2.LINE_AA)
+                cv2.putText(
+                    canvas, txt, (box_x + pad_x, box_y + pad_y + th),
+                    font, font_scale, (255, 255, 255), thick, cv2.LINE_AA
+                )
+
+        # 5. Kursor Azimut Sasaran (Target Azimuth Line & Marker)
         # ponytail: argmin lookup over precomputed azimuths; upgrade to pinhole inversion if azimuth grid is non-uniform
         if target_x is None and target_az is not None:
             if azimuths is not None and len(azimuths) == w:
@@ -519,13 +642,19 @@ class HorizonDetector:
             if target_az is not None and elevations is not None:
                 alt_val = elevations[target_x]
                 txt = f"Az: {target_az:.2f} deg | Alt: {alt_val:+.2f} deg"
-                tx_box = min(w - 245, max(10, target_x - 120))
-                ty_box = max(35, ty - 25)
-                cv2.rectangle(canvas, (tx_box, ty_box - 20), (tx_box + 240, ty_box + 8), (20, 20, 25), -1)
-                cv2.rectangle(canvas, (tx_box, ty_box - 20), (tx_box + 240, ty_box + 8), (0, 50, 255), 1)
+                font = cv2.FONT_HERSHEY_SIMPLEX
+                font_scale = 0.42
+                (tw, th), baseline = cv2.getTextSize(txt, font, font_scale, 1)
+                tx_box = min(w - tw - 24, max(10, target_x - tw // 2))
+                ty_box = max(th + 16, ty - 26)
+                box_w = tw + 18
+                box_h = th + baseline + 10
+                box_top = ty_box - th - 5
+                cv2.rectangle(canvas, (tx_box, box_top), (tx_box + box_w, box_top + box_h), (20, 20, 25), -1)
+                cv2.rectangle(canvas, (tx_box, box_top), (tx_box + box_w, box_top + box_h), (0, 50, 255), 1, cv2.LINE_AA)
                 cv2.putText(
-                    canvas, txt, (tx_box + 6, ty_box - 4),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), 1, cv2.LINE_AA
+                    canvas, txt, (tx_box + 8, ty_box),
+                    font, font_scale, (255, 255, 255), 1, cv2.LINE_AA
                 )
 
         return canvas

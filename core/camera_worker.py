@@ -13,6 +13,43 @@ from PyQt5.QtCore import QThread, pyqtSignal, QMutex, QMutexLocker
 from core.sample_generator import generate_synthetic_horizon
 
 
+def find_best_camera_index(preferred: Optional[int] = None) -> int:
+    """
+    Mendeteksi dan memprioritaskan kamera eksternal USB (seperti Logitech C270 / Eyepiece)
+    sebelum memilih webcam internal laptop (index 0).
+    """
+    import sys
+    if preferred is not None and preferred >= 0:
+        return preferred
+
+    backend = cv2.CAP_DSHOW if sys.platform.startswith("win") else cv2.CAP_ANY
+
+    # Cek index 1 s.d. 3 (kamera eksternal Logitech / USB)
+    for idx in [1, 2, 3]:
+        try:
+            cap = cv2.VideoCapture(idx, backend)
+            if cap.isOpened():
+                ret, _ = cap.read()
+                cap.release()
+                if ret:
+                    return idx
+        except Exception:
+            pass
+
+    # Fallback ke index 0 (kamera internal laptop)
+    try:
+        cap = cv2.VideoCapture(0, backend)
+        if cap.isOpened():
+            ret, _ = cap.read()
+            cap.release()
+            if ret:
+                return 0
+    except Exception:
+        pass
+
+    return 0
+
+
 class CameraWorker(QThread):
     """
     QThread pekerja untuk membaca frame video dari kamera USB secara kontinu.
@@ -22,9 +59,9 @@ class CameraWorker(QThread):
     status_changed = pyqtSignal(bool, str)
     error_occurred = pyqtSignal(str)
 
-    def __init__(self, camera_index: int = 0, is_simulation: bool = False, parent=None):
+    def __init__(self, camera_index: Optional[int] = None, is_simulation: bool = False, parent=None):
         super().__init__(parent)
-        self.camera_index = camera_index
+        self.camera_index = find_best_camera_index(camera_index) if camera_index is None else camera_index
         self.is_simulation = is_simulation
         self._running = False
         self._mutex = QMutex()
@@ -56,8 +93,12 @@ class CameraWorker(QThread):
 
         cap = None
         if not self.is_simulation:
-            # Buka kamera OpenCV dengan backend V4L2 pada Linux
-            cap = cv2.VideoCapture(self.camera_index, cv2.CAP_V4L2)
+            import sys
+            if sys.platform.startswith("win"):
+                cap = cv2.VideoCapture(self.camera_index, cv2.CAP_DSHOW)
+            else:
+                cap = cv2.VideoCapture(self.camera_index, cv2.CAP_V4L2)
+
             if not cap.isOpened():
                 # Fallback ke default capture
                 cap = cv2.VideoCapture(self.camera_index)

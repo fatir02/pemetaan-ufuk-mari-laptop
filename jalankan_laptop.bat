@@ -27,7 +27,7 @@ if %errorlevel% neq 0 (
 )
 
 :: 2. Verifikasi dan pasang dependensi otomatis jika belum lengkap
-python -c "import flask, cv2, PyQt5, openpyxl, pypdfium2, reportlab, matplotlib, scipy, numpy" >nul 2>&1
+python -c "import flask, cv2, PyQt5, openpyxl, pypdfium2, reportlab, matplotlib, scipy, numpy, serial" >nul 2>&1
 if %errorlevel% neq 0 (
     echo [INFO] Terdeteksi pustaka yang dibutuhkan belum lengkap terpasang.
     echo Sedang menginstal dependensi dari requirements.txt secara otomatis...
