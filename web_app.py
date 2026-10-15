@@ -153,27 +153,69 @@ HTML_TEMPLATE = """
     .badge-info { background-color: #0c4a6e; color: #38bdf8; border: 1px solid #0284c7; }
     .badge-accent { background-color: #1e1b4b; color: #a5b4fc; border: 1px solid #4338ca; }
 
-    /* Dual visual layout */
-    .dual-visual-wrapper {
-      display: flex;
-      flex-direction: column;
-      gap: 14px;
-      margin-bottom: 14px;
-    }
-    .visual-card { padding: 14px; }
-    .img-wrapper {
+    /* Result visual layout */
+    .visual-card { padding: 14px; margin-bottom: 14px; }
+    .img-interactive-container {
       position: relative;
-      background: #000;
+      background: #020617;
       border-radius: 8px;
       overflow: hidden;
       border: 1px solid #334155;
+      touch-action: none;
+      user-select: none;
+      cursor: crosshair;
+      min-height: 420px;
+      max-height: 640px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
-    .result-img {
+    .zoom-pan-viewport {
       width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transform-origin: center center;
+      will-change: transform;
+    }
+    .result-img-interactive {
+      max-width: 100%;
+      max-height: 620px;
       height: auto;
-      display: block;
       object-fit: contain;
-      max-height: 380px;
+      display: block;
+      pointer-events: auto;
+    }
+    .btn-tool {
+      background: #1e293b;
+      color: #f1f5f9;
+      border: 1px solid #475569;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .btn-tool:hover {
+      background: #334155;
+    }
+    .interactive-hint-badge {
+      position: absolute;
+      bottom: 8px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(15, 23, 42, 0.88);
+      backdrop-filter: blur(6px);
+      border: 1px solid #334155;
+      padding: 4px 14px;
+      border-radius: 20px;
+      font-size: 0.72rem;
+      color: #94a3b8;
+      pointer-events: none;
+      z-index: 5;
+      white-space: nowrap;
     }
 
     /* Stats Cards */
@@ -451,11 +493,6 @@ HTML_TEMPLATE = """
         max-height: calc(100vh - 220px);
         min-height: 480px;
       }
-      .dual-visual-wrapper {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 16px;
-      }
       .stats-grid {
         grid-template-columns: repeat(4, 1fr);
         gap: 12px;
@@ -463,8 +500,8 @@ HTML_TEMPLATE = """
       .grid-4 {
         grid-template-columns: 1fr 1fr;
       }
-      .result-img {
-        max-height: 340px;
+      .result-img-interactive {
+        max-height: 580px;
       }
     }
   </style>
@@ -651,26 +688,38 @@ HTML_TEMPLATE = """
         <!-- HASIL OLAH & KURVA PROFIL -->
         <div id="resultSection" style="display: none;">
           
-          <!-- DUAL VISUAL SECTION (SIDE-BY-SIDE ON LAPTOP) -->
-          <div class="dual-visual-wrapper">
-            <div class="card visual-card">
-              <div class="card-title">
+          <!-- CITRA HASIL KONTUR UFUK MAR'I INTERAKTIF (FULL WIDTH) -->
+          <div class="card visual-card">
+            <div class="card-title" style="flex-wrap: wrap; gap: 8px;">
+              <div style="display: flex; align-items: center; gap: 8px;">
                 <span>⛰️ 3. Citra Hasil Kontur Ufuk Mar'i</span>
                 <span id="resBadge" class="badge badge-success">Analisis Selesai</span>
               </div>
-              <div class="img-wrapper">
-                <img id="resOverlayImg" class="result-img" alt="Hasil Kontur">
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <button type="button" class="btn-tool" onclick="zoomInImg()" title="Perbesar (Zoom In)">🔍 +</button>
+                <button type="button" class="btn-tool" onclick="zoomOutImg()" title="Perkecil (Zoom Out)">🔍 -</button>
+                <button type="button" class="btn-tool" onclick="resetImgZoom()" title="Kembali ke 100%">↺ 100%</button>
+                <span id="zoomLevelBadge" class="badge badge-info" style="font-size: 0.72rem;">100%</span>
               </div>
             </div>
+            <div class="img-interactive-container" id="imgInteractiveContainer">
+              <div class="zoom-pan-viewport" id="zoomPanViewport">
+                <img id="resOverlayImg" class="result-img-interactive" alt="Hasil Kontur Ufuk Mar'i" draggable="false">
+              </div>
+              <div class="interactive-hint-badge">
+                <span>👆 Sentuh/Geser Titik Azimut di Gambar &bull; 🤏 2 Jari / Scroll untuk Zoom & Pan</span>
+              </div>
+            </div>
+          </div>
 
-            <div class="card visual-card">
-              <div class="card-title">
-                <span>📈 4. Kurva Profil Elevasi vs Azimuth</span>
-                <span class="badge badge-accent">Fast OpenCV Vector</span>
-              </div>
-              <div class="img-wrapper">
-                <img id="resPlotImg" class="result-img" alt="Grafik Profil">
-              </div>
+          <!-- KURVA PROFIL ELEVASI VS AZIMUTH -->
+          <div class="card visual-card">
+            <div class="card-title">
+              <span>📈 4. Kurva Profil Elevasi vs Azimuth</span>
+              <span class="badge badge-accent">Fast OpenCV Vector</span>
+            </div>
+            <div class="img-wrapper" style="position: relative; background: #020617; border-radius: 8px; overflow: hidden; border: 1px solid #334155; text-align: center;">
+              <img id="resPlotImg" style="width: 100%; max-height: 400px; object-fit: contain; display: block;" alt="Grafik Profil Elevasi vs Azimuth">
             </div>
           </div>
 
@@ -1456,7 +1505,9 @@ HTML_TEMPLATE = """
         };
 
         document.getElementById('resOverlayImg').src = data.overlay_base64;
-        document.getElementById('resPlotImg').src = data.plot_base64;
+        const elPlot = document.getElementById('resPlotImg');
+        if (elPlot) elPlot.src = data.plot_base64;
+        resetImgZoom();
         
         const slider = document.getElementById('sliderAz');
         slider.min = data.az_min.toFixed(2);
@@ -1534,7 +1585,8 @@ HTML_TEMPLATE = """
         .then(res => res.json())
         .then(data => {
           if (data.success) {
-            document.getElementById('resPlotImg').src = data.plot_base64;
+            const elPlot = document.getElementById('resPlotImg');
+            if (elPlot) elPlot.src = data.plot_base64;
             document.getElementById('resOverlayImg').src = data.overlay_base64;
           }
         });
@@ -1829,8 +1881,186 @@ HTML_TEMPLATE = """
       }
       document.getElementById('lblPhotoStatus').innerText = "Belum ada foto yang dipilih";
       document.getElementById('lblPhotoStatus').style.color = "#94a3b8";
+      resetImgZoom();
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
+
+    // ==========================================
+    // INTERACTIVE IMAGE: PINCH-ZOOM & AZIMUTH DRAG
+    // ==========================================
+    let imgZoomScale = 1.0;
+    let imgPanX = 0, imgPanY = 0;
+    let imgInitialPinchDist = null;
+    let imgInitialZoom = 1.0;
+    let isInteractingAzimuth = false;
+    let isPanningImg = false;
+    let imgPanStartX = 0, imgPanStartY = 0;
+
+    function applyImgZoomTransform() {
+      const vp = document.getElementById('zoomPanViewport');
+      const badge = document.getElementById('zoomLevelBadge');
+      if (vp) {
+        vp.style.transform = "translate(" + imgPanX + "px, " + imgPanY + "px) scale(" + imgZoomScale + ")";
+      }
+      if (badge) {
+        badge.innerText = Math.round(imgZoomScale * 100) + "%";
+      }
+    }
+
+    function zoomInImg() {
+      imgZoomScale = Math.min(4.0, imgZoomScale + 0.3);
+      applyImgZoomTransform();
+    }
+
+    function zoomOutImg() {
+      imgZoomScale = Math.max(1.0, imgZoomScale - 0.3);
+      if (imgZoomScale <= 1.05) {
+        imgZoomScale = 1.0;
+        imgPanX = 0;
+        imgPanY = 0;
+      }
+      applyImgZoomTransform();
+    }
+
+    function resetImgZoom() {
+      imgZoomScale = 1.0;
+      imgPanX = 0;
+      imgPanY = 0;
+      applyImgZoomTransform();
+    }
+
+    function getNormalizedImgX(clientX) {
+      const img = document.getElementById('resOverlayImg');
+      if (!img) return null;
+      const rect = img.getBoundingClientRect();
+      if (rect.width <= 0) return null;
+      const relX = (clientX - rect.left) / rect.width;
+      return Math.max(0.0, Math.min(1.0, relX));
+    }
+
+    function updateAzimuthFromImageX(clientX) {
+      const relX = getNormalizedImgX(clientX);
+      if (relX === null) return;
+      const slider = document.getElementById('sliderAz');
+      if (!slider) return;
+      const minAz = parseFloat(slider.min) || 262.5;
+      const maxAz = parseFloat(slider.max) || 277.5;
+      const newAz = minAz + relX * (maxAz - minAz);
+      slider.value = newAz.toFixed(2);
+      onSliderTargetChanged(newAz);
+    }
+
+    function initInteractiveImage() {
+      const container = document.getElementById('imgInteractiveContainer');
+      if (!container) return;
+
+      container.addEventListener('touchstart', function(e) {
+        if (e.touches.length === 1) {
+          if (imgZoomScale <= 1.1) {
+            isInteractingAzimuth = true;
+            updateAzimuthFromImageX(e.touches[0].clientX);
+          } else {
+            isPanningImg = true;
+            imgPanStartX = e.touches[0].clientX - imgPanX;
+            imgPanStartY = e.touches[0].clientY - imgPanY;
+          }
+        } else if (e.touches.length === 2) {
+          isInteractingAzimuth = false;
+          isPanningImg = false;
+          const dx = e.touches[0].clientX - e.touches[1].clientX;
+          const dy = e.touches[0].clientY - e.touches[1].clientY;
+          imgInitialPinchDist = Math.hypot(dx, dy);
+          imgInitialZoom = imgZoomScale;
+        }
+      }, { passive: false });
+
+      container.addEventListener('touchmove', function(e) {
+        e.preventDefault();
+        if (e.touches.length === 1) {
+          if (isInteractingAzimuth) {
+            updateAzimuthFromImageX(e.touches[0].clientX);
+          } else if (isPanningImg) {
+            imgPanX = e.touches[0].clientX - imgPanStartX;
+            imgPanY = e.touches[0].clientY - imgPanStartY;
+            applyImgZoomTransform();
+          }
+        } else if (e.touches.length === 2 && imgInitialPinchDist) {
+          const dx = e.touches[0].clientX - e.touches[1].clientX;
+          const dy = e.touches[0].clientY - e.touches[1].clientY;
+          const dist = Math.hypot(dx, dy);
+          const factor = dist / imgInitialPinchDist;
+          imgZoomScale = Math.min(4.5, Math.max(1.0, imgInitialZoom * factor));
+          applyImgZoomTransform();
+        }
+      }, { passive: false });
+
+      container.addEventListener('touchend', function(e) {
+        if (e.touches.length === 0) {
+          isInteractingAzimuth = false;
+          isPanningImg = false;
+          imgInitialPinchDist = null;
+          if (imgZoomScale <= 1.05) {
+            imgZoomScale = 1.0;
+            imgPanX = 0;
+            imgPanY = 0;
+            applyImgZoomTransform();
+          }
+        } else if (e.touches.length === 1 && imgZoomScale > 1.0) {
+          isPanningImg = true;
+          imgPanStartX = e.touches[0].clientX - imgPanX;
+          imgPanStartY = e.touches[0].clientY - imgPanY;
+        }
+      });
+
+      let isMouseDown = false;
+      container.addEventListener('mousedown', function(e) {
+        if (e.button !== 0) return;
+        isMouseDown = true;
+        if (imgZoomScale <= 1.1) {
+          updateAzimuthFromImageX(e.clientX);
+        } else {
+          isPanningImg = true;
+          imgPanStartX = e.clientX - imgPanX;
+          imgPanStartY = e.clientY - imgPanY;
+        }
+      });
+
+      window.addEventListener('mousemove', function(e) {
+        if (!isMouseDown) return;
+        if (imgZoomScale <= 1.1) {
+          updateAzimuthFromImageX(e.clientX);
+        } else if (isPanningImg) {
+          imgPanX = e.clientX - imgPanStartX;
+          imgPanY = e.clientY - imgPanStartY;
+          applyImgZoomTransform();
+        }
+      });
+
+      window.addEventListener('mouseup', function() {
+        isMouseDown = false;
+        isPanningImg = false;
+      });
+
+      container.addEventListener('wheel', function(e) {
+        e.preventDefault();
+        const delta = e.deltaY < 0 ? 0.25 : -0.25;
+        imgZoomScale = Math.min(4.5, Math.max(1.0, imgZoomScale + delta));
+        if (imgZoomScale <= 1.05) {
+          imgZoomScale = 1.0;
+          imgPanX = 0;
+          imgPanY = 0;
+        }
+        applyImgZoomTransform();
+      }, { passive: false });
+
+      container.addEventListener('dblclick', function() {
+        resetImgZoom();
+      });
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+      initInteractiveImage();
+    });
   </script>
 </body>
 </html>

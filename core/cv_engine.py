@@ -6,6 +6,8 @@ per kolom horizontal, mengonversi ke profil elevasi sudut astronomi.
 """
 
 from typing import Tuple, Dict, Any, Optional
+from itertools import groupby
+from operator import itemgetter
 import numpy as np
 import cv2
 from scipy.signal import medfilt
@@ -55,18 +57,20 @@ class HorizonDetector:
         gray = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2GRAY)
 
         # 1. CLAHE untuk mendongkrak kontras lokal
-        clahe = cv2.createCLAHE(clipLimit=2.5, tileGridSize=(8, 8))
+        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
         enhanced = clahe.apply(gray)
 
         # 2. Bilateral Filter: pereduksi noise yang menjaga ketajaman garis tepi ufuk
-        denoised = cv2.bilateralFilter(enhanced, d=7, sigmaColor=50, sigmaSpace=50)
+        # ponytail: fixed bilateral kernel (d=7); upgrade to adaptive sigma if high-ISO raw plates added
+        denoised = cv2.bilateralFilter(gray, d=7, sigmaColor=40, sigmaSpace=40)
+        enhanced_denoised = cv2.bilateralFilter(enhanced, d=7, sigmaColor=40, sigmaSpace=40)
 
         # 3. Segmentasi Biner Otsu
-        _, binary = cv2.threshold(denoised, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+        _, binary = cv2.threshold(enhanced_denoised, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
         kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))
         binary_clean = cv2.morphologyEx(binary, cv2.MORPH_CLOSE, kernel)
 
-        enhanced_bgr = cv2.cvtColor(denoised, cv2.COLOR_GRAY2BGR)
+        enhanced_bgr = cv2.cvtColor(enhanced_denoised, cv2.COLOR_GRAY2BGR)
         binary_bgr = cv2.cvtColor(binary_clean, cv2.COLOR_GRAY2BGR)
 
         return {
@@ -108,20 +112,30 @@ class HorizonDetector:
         mask = np.zeros((h, w), dtype=np.uint8)
         horizon_y = np.full(w, int(h * 0.5), dtype=np.int32)
 
+        # Deteksi kolom aktif untuk mengabaikan padding letterbox hitam dari kamera/screenshot
+        col_mean = np.mean(image_bgr, axis=(0, 2))
+        col_valid = col_mean > 3.0
+        if np.any(col_valid):
+            x_start = int(np.min(np.where(col_valid)[0]))
+            x_end = int(np.max(np.where(col_valid)[0]))
+        else:
+            x_start, x_end = 0, w - 1
+
         if method == self.METHOD_GRADIENT:
             # Algoritma Multi-Spectral OpenCV + Dynamic Programming (DP) Skyline Extraction
             # 1. Konversi ke ruang warna Lab untuk mengekstraksi Luminance (L) dan opponent color b*
             #    (langit senja memiliki pendaran kuning keemasan kuat pada kanal b*, sedangkan daratan/bukit gelap)
             lab = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2LAB)
-            l_chan = lab[:, :, 0]
-            b_chan = lab[:, :, 2]
+            # ponytail: gaussian blur (5x5, s=1.0) on L/b suppresses sensor speckle; upgrade to guided filter if sharp masts present
+            l_chan = cv2.GaussianBlur(lab[:, :, 0], (5, 5), 1.0)
+            b_chan = cv2.GaussianBlur(lab[:, :, 2], (5, 5), 1.0)
 
             sign = -1.0 if not invert_mask else 1.0
 
-            # Hitung gradien vertikal OpenCV Sobel ksize=5
-            sobel_l = cv2.Sobel(l_chan, cv2.CV_64F, 0, 1, ksize=5)
-            sobel_gray = cv2.Sobel(gray, cv2.CV_64F, 0, 1, ksize=5)
-            sobel_b = cv2.Sobel(b_chan, cv2.CV_64F, 0, 1, ksize=5)
+            # Hitung gradien vertikal OpenCV Sobel ksize=5 (menggunakan float32 teroptimasi SIMD)
+            sobel_l = cv2.Sobel(l_chan, cv2.CV_32F, 0, 1, ksize=5)
+            sobel_gray = cv2.Sobel(gray, cv2.CV_32F, 0, 1, ksize=5)
+            sobel_b = cv2.Sobel(b_chan, cv2.CV_32F, 0, 1, ksize=5)
 
             gl_pos = np.clip(sign * sobel_l[y_min:y_max, :], 0, None)
             gg_pos = np.clip(sign * sobel_gray[y_min:y_max, :], 0, None)
@@ -130,15 +144,17 @@ class HorizonDetector:
             # 2. Filter Step-Edge Vertikal OpenCV untuk menekan rumbai awan tipis (cloud bands)
             k_size = 17
             k_half = k_size // 2
-            step_kernel = np.zeros((k_size, 1), dtype=np.float64)
-            step_kernel[:k_half, 0] = sign / float(k_half)
-            step_kernel[k_half + 1:, 0] = -sign / float(k_half)
-            step_resp = cv2.filter2D(gray.astype(np.float64), -1, step_kernel)[y_min:y_max, :]
+            step_kernel = np.zeros((k_size, 1), dtype=np.float32)
+            # Response positif saat langit atas terang bertransisi ke daratan gelap di bawah
+            step_sign = 1.0 if not invert_mask else -1.0
+            step_kernel[:k_half, 0] = step_sign / float(k_half)
+            step_kernel[k_half + 1:, 0] = -step_sign / float(k_half)
+            step_resp = cv2.filter2D(gray.astype(np.float32), -1, step_kernel)[y_min:y_max, :]
             step_pos = np.clip(step_resp, 0, None)
 
-            # Normalisasi robust setiap komponen sebelum fusi
+            # Normalisasi robust setiap komponen sebelum fusi (strided percentile untuk efisiensi tinggi)
             def _norm_energy(mat: np.ndarray) -> np.ndarray:
-                p995 = float(np.percentile(mat, 99.5))
+                p995 = float(np.percentile(mat[::2, ::2], 99.5))
                 return mat / p995 if p995 > 1e-4 else np.zeros_like(mat)
 
             e_l = _norm_energy(gl_pos)
@@ -149,17 +165,19 @@ class HorizonDetector:
             # Fusi energi multi-spektral astronomis
             energy = 0.35 * e_l + 0.25 * e_gray + 0.25 * e_b + 0.15 * e_step
 
-            # Prioritas batas teratas (Zenith-to-Nadir Sky Prior):
-            # Ufuk mar'i sejati adalah batas transisi utama pertama dari kubah langit terbuka.
-            # Tepi pantulan cahaya di permukaan air laut (glare/reflection) di bawah siluet daratan
-            # ditekan agar kontur konsisten mengikuti punggung daratan dan tidak anjlok ke air.
+            # Prioritas batas teratas (Zenith-to-Nadir Skyline Prior):
+            # Ufuk mar'i sejati adalah batas transisi pertama dari kubah langit terbuka ke daratan.
+            # Kontur/tepi objek di bawah batas pertama (atap bangunan foreground, ekskavator, jalan, pantulan air)
+            # ditekan secara eksponensial seiring bertambahnya energi kumulatif dari atas.
+            # ponytail: exponential decay rate 4.5; upgrade to sky semantic mask if dense cloud shadows mimic skyline
             cum_energy = np.cumsum(energy, axis=0)
             max_cum = np.maximum(cum_energy[-1:, :], 1e-4)
-            zenith_weight = np.exp(-1.1 * (cum_energy / max_cum))
-            energy_weighted = energy * (0.50 + 0.50 * zenith_weight)
+            norm_cum = cum_energy / max_cum
+            zenith_weight = np.exp(-4.5 * (norm_cum ** 1.2))
+            energy_weighted = energy * zenith_weight
 
             # 3. Normalisasi kolom dengan Global Floor untuk mencegah amplifikasi noise pada kolom berkabut
-            p99_e = float(np.percentile(energy_weighted, 99.5))
+            p99_e = float(np.percentile(energy_weighted[::2, ::2], 99.5))
             global_floor = max(0.15 * p99_e, 1e-4)
             col_max = np.maximum(np.max(energy_weighted, axis=0, keepdims=True), global_floor)
             energy_norm = energy_weighted / col_max
@@ -188,14 +206,18 @@ class HorizonDetector:
                 parent[:, x] = np.clip(y_grid - max_jump + min_idx, 0, roi_h - 1)
 
             horizon_roi = np.zeros(w, dtype=np.int32)
-            horizon_roi[-1] = int(np.argmin(dp[:, -1]))
-            for x in range(w - 2, -1, -1):
+            horizon_roi[x_end] = int(np.argmin(dp[:, x_end]))
+            for x in range(x_end - 1, x_start - 1, -1):
                 horizon_roi[x] = parent[horizon_roi[x + 1], x + 1]
+            for x in range(x_end + 1, w):
+                horizon_roi[x] = horizon_roi[x_end]
+            for x in range(x_start - 1, -1, -1):
+                horizon_roi[x] = horizon_roi[x_start]
 
             # 4. Interpolasi Puncak Parabolik Sub-Piksel (3-Point Parabolic Peak Interpolation)
             # Menghilangkan efek kuantisasi undakan tangga (stair-stepping) pada elevasi sudut astronomi
             subpixel_roi = horizon_roi.astype(np.float64)
-            for x in range(w):
+            for x in range(x_start, x_end + 1):
                 y_pk = horizon_roi[x]
                 if 1 <= y_pk < roi_h - 1:
                     e_prev = float(energy[y_pk - 1, x])
@@ -203,7 +225,7 @@ class HorizonDetector:
                     e_next = float(energy[y_pk + 1, x])
                     denom = 2.0 * (2.0 * e_curr - e_prev - e_next)
                     if abs(denom) > 1e-5:
-                        delta_pk = (e_prev - e_next) / denom
+                        delta_pk = (e_next - e_prev) / denom
                         subpixel_roi[x] += np.clip(delta_pk, -0.5, 0.5)
 
             raw_horizon_y = y_min + subpixel_roi
@@ -220,11 +242,18 @@ class HorizonDetector:
             closed = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, kernel_close)
 
             # Temukan tepi pertama dari atas di dalam rentang ROI
-            col_y = np.full(w, int(h * 0.55), dtype=np.float64)
+            col_y = np.full(w, np.nan, dtype=np.float64)
             for x in range(w):
                 col_edges = np.where(closed[y_min:y_max, x] > 0)[0]
                 if len(col_edges) > 0:
                     col_y[x] = y_min + col_edges[0]
+            valid_mask = ~np.isnan(col_y)
+            if np.any(valid_mask):
+                valid_x = np.where(valid_mask)[0]
+                valid_y = col_y[valid_mask]
+                col_y = np.interp(np.arange(w), valid_x, valid_y)
+            else:
+                col_y = np.full(w, int(h * 0.55), dtype=np.float64)
             raw_horizon_y = col_y
 
         else:
@@ -242,12 +271,19 @@ class HorizonDetector:
             kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (7, 5))
             cleaned_mask = cv2.morphologyEx(raw_mask, cv2.MORPH_CLOSE, kernel)
 
-            col_y = np.full(w, float(y_max), dtype=np.float64)
+            col_y = np.full(w, np.nan, dtype=np.float64)
             for x in range(w):
                 col = cleaned_mask[y_min:y_max, x]
                 ground_idxs = np.where(col > 0)[0]
                 if len(ground_idxs) > 0:
                     col_y[x] = y_min + ground_idxs[0]
+            valid_mask = ~np.isnan(col_y)
+            if np.any(valid_mask):
+                valid_x = np.where(valid_mask)[0]
+                valid_y = col_y[valid_mask]
+                col_y = np.interp(np.arange(w), valid_x, valid_y)
+            else:
+                col_y = np.full(w, float(y_max), dtype=np.float64)
             raw_horizon_y = col_y
 
         # Smoothing kontur untuk membuang artefak tajam/noise kabel tanpa mengubah lekuk bukit
@@ -256,10 +292,62 @@ class HorizonDetector:
             # Menggunakan boundary mode 'nearest' agar tepi kiri dan kanan tidak loncat/anjlok
             from scipy.ndimage import median_filter, uniform_filter1d
             filtered = median_filter(raw_horizon_y, size=sw, mode="nearest")
-            smoothed = uniform_filter1d(filtered, size=5, mode="nearest")
-            horizon_y = np.clip(smoothed, float(y_min), float(y_max))
+            base_smoothed = uniform_filter1d(filtered, size=5, mode="nearest")
+            horizon_y = np.clip(base_smoothed, float(y_min), float(y_max))
         else:
             horizon_y = raw_horizon_y
+
+        # Integrasi halangan vertikal ramping (menara BTS, menara SUTET, menara air, tiang antena)
+        # Menggunakan analisis statistik kontras horizontal zona langit OpenCV hitam-putih
+        # untuk membedakan struktur menara fisik dari variasi awan/langit alami.
+        # ponytail: width <= 35px & contrast >= 10.0; upgrade to Hough line detector for faint wire stays
+        try:
+            min_base = int(np.clip(np.min(horizon_y) - 10, y_min, y_max))
+            if min_base > y_min + 20:
+                sky_zone = gray[y_min:min_base, :]
+                p25 = float(np.percentile(sky_zone, 25))
+                sky_thresh = p25
+
+                obs_mask = (gray < sky_thresh).astype(np.uint8) * 255
+                kernel_vert = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 15))
+                obs_closed = cv2.morphologyEx(obs_mask, cv2.MORPH_CLOSE, kernel_vert)
+
+                tower_y = np.copy(horizon_y)
+                for x in range(x_start, x_end + 1):
+                    b_idx = int(horizon_y[x])
+                    if b_idx >= h:
+                        continue
+                    col = obs_closed[:b_idx + 2, x]
+                    curr = b_idx
+                    while curr > y_min and col[curr] > 0:
+                        curr -= 1
+                    if curr < b_idx - 3:
+                        tower_y[x] = float(curr)
+
+                is_obstacle = (tower_y < horizon_y - 8)
+                jumps = np.where(is_obstacle)[0]
+                for _, g in groupby(enumerate(jumps), lambda ix: ix[0] - ix[1]):
+                    group = list(map(itemgetter(1), g))
+                    width = len(group)
+                    tip_y = np.min(tower_y[group])
+                    base_y = np.median(horizon_y[group])
+                    height = base_y - tip_y
+
+                    # Validasi kontras horizontal terhadap langit di samping kiri dan kanan struktur
+                    y_check = int(round(tip_y + min(5, height * 0.3)))
+                    x_l = max(0, group[0] - max(6, width))
+                    x_r = min(w - 1, group[-1] + max(6, width))
+                    sky_l = float(gray[y_check, x_l])
+                    sky_r = float(gray[y_check, x_r])
+                    obj_val = float(np.min(gray[y_check, group[0]:group[-1]+1]))
+                    contrast = min(sky_l, sky_r) - obj_val
+
+                    # Struktur fisik sejati: ramping (width <= 35) dan memiliki kontras gelap
+                    # terhadap latar langit di sampingnya (contrast >= 10.0), menolak awan datar
+                    if 2 <= width <= 35 and contrast >= 10.0:
+                        horizon_y[group] = tower_y[group]
+        except Exception:
+            pass
 
         # Buat mask biner tanah/halangan
         int_y = np.clip(np.round(horizon_y).astype(np.int32), 0, h - 1)
@@ -409,6 +497,17 @@ class HorizonDetector:
         cv2.polylines(canvas, [pts], isClosed=False, color=(0, 255, 255), thickness=line_thick, lineType=cv2.LINE_AA)
 
         # 4. Kursor Azimut Sasaran (Target Azimuth Line & Marker)
+        # ponytail: argmin lookup over precomputed azimuths; upgrade to pinhole inversion if azimuth grid is non-uniform
+        if target_x is None and target_az is not None:
+            if azimuths is not None and len(azimuths) == w:
+                target_x = int(np.argmin(np.abs(azimuths - target_az)))
+            else:
+                from core.falak_calc import azimuth_elevation_to_pixel
+                tx_calc, _ = azimuth_elevation_to_pixel(
+                    target_az, 0.0, w, h, az_center, hfov, vfov, tilt_center
+                )
+                target_x = int(round(tx_calc))
+
         if target_x is not None and 0 <= target_x < w:
             raw_ty = horizon_y[target_x] if target_y is None else target_y
             ty = int(round(raw_ty))

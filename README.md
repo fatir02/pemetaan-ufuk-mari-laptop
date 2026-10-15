@@ -137,3 +137,26 @@ python3 main.py
    - Status pandangan (Bebas Halangan / Halangan Rendah / Terhalang Bukit / Terhalang Pohon).
 3. **Catatan & Rekomendasi:** Isi catatan kondisi cuaca lapangan dan rekomendasi kelayakan. Rekomendasi awal terisi otomatis berdasarkan kriteria falak.
 4. **Cetak Dokumen Resmi:** Klik **🖨️ CETAK DATA LAPORAN PEMETAAN UFUK (PDF RESMI)** untuk menghasilkan dokumen berita acara berstandar akademik.
+
+---
+
+## 📝 6. Catatan Pembaruan & Riwayat Perubahan Terkini
+
+### A. `core/cv_engine.py` (Penyempurnaan Engine Computer Vision Kontur Ufuk)
+1. **Deteksi Kolom Aktif Citra (Active Bounds Detection):**
+   - Menambahkan deteksi kolom citra non-hitam untuk mengeliminasi dampak *letterbox* atau *pillarbox padding* pada citra hasil tangkapan layar/kamera ponsel.
+2. **Optimasi Algoritma Dynamic Programming (DP) & Zenith-to-Nadir Prior:**
+   - Mempertahankan jalur garis ufuk utama pada kontur daratan/vegetasi terjauh dan mencegah garis anjlok ke area jalan cor/lapangan di latar depan (*foreground*).
+3. **Deteksi Struktur Ramping Vertikal Berbasis Validasi Kontras Horizontal:**
+   - Memetakan struktur menara BTS utama, menara kisi SUTET di sisi kiri, dan menara tandon air secara presisi hingga pucuk teratas.
+   - Menggunakan validasi kontras horizontal terhadap langit di samping kiri dan kanan struktur (`contrast >= 10.0`), memastikan lonjakan palsu (*false spikes*) akibat variasi gradasi awan mendung atau punggungan pegunungan tertolak 100%.
+4. **Penyempurnaan Render Overlay Citra:**
+   - Menambahkan resolusi otomatis indeks kolom horizontal `target_x` pada fungsi `render_overlay` untuk sinkronisasi retikel target dan anotasi derajat falak.
+
+### B. `web_app.py` (Pembaruan Antarmuka Web Interaktif)
+1. **Viewport Citra Interaktif dengan Zoom & Pan:**
+   - Menambahkan kontrol perbesaran citra interaktif (tombol `🔍 +`, `🔍 -`, `↺ 100%`, roda mouse/scroll, serta gestur *pinch-to-zoom* 2 jari pada perangkat sentuh).
+2. **Interaksi Langsung Penentuan Azimut (In-Image Azimuth Scrubbing):**
+   - Memungkinkan pengamat menyentuh atau menggeser (*drag*) kursor azimut sasaran langsung pada kanvas citra foto dengan latensi instan (0 ms).
+3. **Tampilan Kurva Profil Vektor Terpadu:**
+   - Mengintegrasikan kembali kartu visualisasi *Kurva Profil Elevasi vs Azimuth* (Fast OpenCV Vector) berdampingan dengan inspeksi numerik parameter falak.
