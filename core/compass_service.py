@@ -4,6 +4,7 @@ Service pembaca serial sensor kompas (BNO055 / QMC5883L) asinkron dan thread-saf
 Mendukung auto-detect port COM dan auto-reconnect tanpa memblokir GUI/Web server.
 """
 
+import os
 import time
 import json
 import threading
@@ -26,9 +27,18 @@ class CompassService:
         self._thread: Optional[threading.Thread] = None
         self._running = False
         self._lock = threading.Lock()
+
+        # Kalibrasi zero-tilt: default -82.7° (posisi mount fisik tegak kamera saat level)
+        self.calib_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "compass_calibration.json")
+        self.tilt_offset = -82.7
+        self._raw_tilt = -82.7
+        self._load_calibration()
+
         self._data: Dict[str, Any] = {
             "azimuth": 270.0,
             "tilt": 0.0,
+            "raw_tilt": self._raw_tilt,
+            "tilt_offset": self.tilt_offset,
             "cal_mag": 0,
             "cal_gyro": 0,
             "connected": False,
@@ -36,6 +46,35 @@ class CompassService:
             "status": "Inisialisasi...",
             "last_update": 0,
         }
+
+    def _load_calibration(self):
+        try:
+            if os.path.exists(self.calib_file):
+                with open(self.calib_file, "r") as f:
+                    d = json.load(f)
+                    if "tilt_offset" in d:
+                        self.tilt_offset = float(d["tilt_offset"])
+        except Exception:
+            pass
+
+    def _save_calibration(self):
+        try:
+            with open(self.calib_file, "w") as f:
+                json.dump({"tilt_offset": self.tilt_offset}, f, indent=2)
+        except Exception:
+            pass
+
+    def set_zero_tilt(self, offset_val: Optional[float] = None) -> float:
+        """Nolkan sudut kemiringan kamera pada posisi fisik saat ini sebagai level 0.0°."""
+        with self._lock:
+            if offset_val is not None:
+                self.tilt_offset = float(offset_val)
+            else:
+                self.tilt_offset = self._raw_tilt
+            self._save_calibration()
+            self._data["tilt_offset"] = self.tilt_offset
+            self._data["tilt"] = round(self._raw_tilt - self.tilt_offset, 1)
+            return self.tilt_offset
 
     def start(self):
         if self._running or not SERIAL_AVAILABLE:
@@ -103,7 +142,16 @@ class CompassService:
                                 if "azimuth" in parsed:
                                     self._data["azimuth"] = float(parsed["azimuth"])
                                 if "tilt" in parsed:
-                                    self._data["tilt"] = float(parsed["tilt"])
+                                    raw_t = float(parsed["tilt"])
+                                    self._raw_tilt = raw_t
+                                    eff_t = raw_t - self.tilt_offset
+                                    if eff_t > 180.0:
+                                        eff_t -= 360.0
+                                    elif eff_t < -180.0:
+                                        eff_t += 360.0
+                                    self._data["raw_tilt"] = raw_t
+                                    self._data["tilt_offset"] = self.tilt_offset
+                                    self._data["tilt"] = round(eff_t, 1)
                                 if "cal_mag" in parsed:
                                     self._data["cal_mag"] = int(parsed.get("cal_mag", 0))
                                 if "cal_gyro" in parsed:

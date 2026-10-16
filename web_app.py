@@ -14,6 +14,7 @@ import sys
 import io
 import time
 import base64
+import subprocess
 import numpy as np
 import cv2
 import pypdfium2
@@ -730,17 +731,37 @@ HTML_TEMPLATE = """
           <input type="file" id="galleryInput" accept="image/*" multiple style="display: none;" onchange="onFileSelected(this)">
 
           <div id="liveCamWrapper">
-            <!-- Pilihan Sumber Perangkat Kamera -->
+            <!-- Pilihan Sumber Perangkat Kamera (Muncul saat kamera aktif seperti semula) -->
             <div style="background: rgba(15, 23, 42, 0.95); padding: 8px 12px; display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; border-bottom: 1px solid #334155;">
-              <div style="display: flex; align-items: center; gap: 6px;">
+              <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
                 <span style="font-size: 0.78rem; color: #38bdf8; font-weight: bold;">📹 Sumber:</span>
-                <select id="cameraSourceSelect" onchange="onCameraDeviceSelected(this.value)" style="width: auto; max-width: 200px; padding: 4px 8px; font-size: 0.75rem; background: #1a2436; border: 1px solid #334155; border-radius: 6px; color: #ffffff;">
+                <select id="cameraSourceSelect" onchange="onCameraDeviceSelected(this.value)" style="width: auto; max-width: 250px; padding: 4px 8px; font-size: 0.75rem; background: #1a2436; border: 1px solid #334155; border-radius: 6px; color: #ffffff;">
                   <option value="">Deteksi Kamera...</option>
                 </select>
+                <button type="button" id="btnRefreshCam" onclick="refreshCameraDevices()" title="Cari ulang kamera USB yang baru dicolokkan" style="background: #0284c7; border: 1px solid #38bdf8; border-radius: 5px; color: #ffffff; padding: 3px 8px; font-size: 0.74rem; cursor: pointer; display: inline-flex; align-items: center; gap: 3px; font-weight: 600;">
+                  🔄 Segarkan
+                </button>
               </div>
-              <button type="button" onclick="toggleHpCameraGuide()" style="background: none; border: none; color: #38bdf8; font-size: 0.74rem; cursor: pointer; text-decoration: underline;">
-                📲 Cara Hubungkan Kamera HP
-              </button>
+              <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                <button type="button" onclick="toggleDigicamGuide()" style="background: none; border: none; color: #fbbf24; font-size: 0.74rem; cursor: pointer; text-decoration: underline; font-weight: 600;">
+                  📷 Petunjuk Pocket
+                </button>
+                <button type="button" onclick="toggleHpCameraGuide()" style="background: none; border: none; color: #38bdf8; font-size: 0.74rem; cursor: pointer; text-decoration: underline;">
+                  📲 Cara Hubungkan Kamera HP
+                </button>
+              </div>
+            </div>
+
+            <!-- Petunjuk Kamera Digicam / Pocket -->
+            <div id="digicamGuide" style="display: none; background: #172554; padding: 10px 14px; border-bottom: 1px solid #3b82f6; font-size: 0.75rem; color: #e2e8f0; line-height: 1.5;">
+              <b style="color: #fbbf24; display: block; margin-bottom: 4px;">📷 Cara Menghubungkan Kamera Saku / Digicam USB:</b>
+              <p>Jika layar kamera menampilkan tulisan <b>"Penyimpanan Massal"</b>, kamera saat ini masih berfungsi sebagai <i>Flashdisk</i> (akses SD card), bukan Webcam. Agar muncul di pilihan sumber:</p>
+              <ul style="margin: 4px 0 6px 18px; padding: 0;">
+                <li><b>Opsi 1 (Colok Ulang):</b> Cabut kabel USB dan colok kembali. Saat layar kamera menyala, gunakan tombol <b>Panah Bawah / Atas</b> di kamera untuk memilih <b>"Kamera PC" (PC Camera)</b>, lalu tekan <b>OK</b>.</li>
+                <li><b>Opsi 2 (Tombol Kamera):</b> Saat layar kamera bertuliskan "Penyimpanan Massal", coba tekan 1x tombol <b>Power</b>, tombol <b>Mode</b>, atau tombol <b>Shutter</b> pada kamera untuk berganti ke mode Webcam.</li>
+                <li><b>Opsi 3 (Menu Kamera):</b> Cabut kabel USB, nyalakan kamera, buka <b>Menu &gt; Pengaturan (Setup) &gt; Mode USB</b>, ubah ke <b>"Kamera PC"</b>, lalu colokkan kembali kabel USB ke laptop.</li>
+              </ul>
+              <p style="color: #38bdf8; margin-top: 4px;">Setelah mode kamera beralih ke Kamera PC, klik tombol <b>🔄 Segarkan</b> di atas. Kamera akan otomatis muncul sebagai <b>GENERAL-A-VIDEO / Kamera Saku USB</b>.</p>
             </div>
 
             <!-- Petunjuk Cepat Hubungkan HP -->
@@ -750,6 +771,12 @@ HTML_TEMPLATE = """
               <p>2. Sambungkan HP ke Laptop via Wi-Fi yang sama atau kabel USB.</p>
               <p>3. Kamera HP otomatis terdeteksi pada pilihan <b>Sumber</b> di atas!</p>
               <p style="color: #64748b; margin-top: 4px;"><i>Nanti saat sudah memiliki alat teleskop / USB eyepiece camera khusus, cukup colok kabel USB ke laptop dan pilih dari dropdown yang sama.</i></p>
+            </div>
+
+            <!-- Banner Peringatan jika Digicam masih dalam mode Penyimpanan Massal -->
+            <div id="digicamNotice" style="display: none; background: #7c2d12; border: 1px solid #ea580c; border-radius: 8px; padding: 10px 14px; margin: 8px 12px; font-size: 0.76rem; color: #ffedd5; line-height: 1.45;">
+              ⚠️ <b style="color: #fef08a;">Kamera Saku Terdeteksi dalam Mode "Penyimpanan Massal":</b><br>
+              Kamera tercolok sebagai kartu memori/flashdisk (bukan webcam). Silakan ubah ke mode <b>"Kamera PC"</b> pada kamera (cabut-colok lalu pilih Kamera PC, atau tekan tombol Power/Mode/Shutter di kamera), lalu klik tombol <b>🔄 Segarkan</b>.
             </div>
 
             <!-- Frame Viewport Kamera Mandiri (Overlay Canvas Terkunci di Dalam Frame Video) -->
@@ -763,8 +790,11 @@ HTML_TEMPLATE = """
               <canvas id="cameraOverlay"></canvas>
 
               <div class="cam-controls">
-                <button type="button" class="btn-shutter" onclick="captureLiveFrame()">
-                  📸 AMBIL FRAME
+                <button type="button" class="btn-shutter" onclick="captureLiveFrame()" title="Ambil frame foto atau tekan Spasi di keyboard">
+                  📸 AMBIL FRAME (SPASI)
+                </button>
+                <button type="button" class="btn-zero-tilt" onclick="zeroCurrentTilt()" title="Nolkan kemiringan kamera saat ini sebagai 0.0° Level" style="background: #0f766e; border: 1px solid #14b8a6; color: #ffffff; padding: 6px 12px; font-size: 0.78rem; border-radius: 6px; cursor: pointer; font-weight: bold; display: inline-flex; align-items: center; gap: 4px;">
+                  🎯 Nolkan Tilt (0.0°)
                 </button>
                 <button type="button" class="btn-fullscreen-cam" onclick="toggleCameraFullscreen()">
                   ⛶ Layar Penuh
@@ -815,6 +845,25 @@ HTML_TEMPLATE = """
                 </div>
                 <img id="slotImg2" style="display: none;" alt="Slot 3">
               </div>
+            </div>
+          </div>
+
+          <!-- BAR INFORMASI FOLDER HASIL JEPRETAN -->
+          <div style="margin-top: 12px; padding: 10px 14px; background: rgba(15, 23, 42, 0.95); border: 1px solid #334155; border-radius: 8px; display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 1.2rem;">📁</span>
+              <div>
+                <span style="font-size: 0.77rem; color: #38bdf8; font-weight: bold; display: block;">Folder Khusus Hasil Jepretan:</span>
+                <span id="lblLastSavedCapture" style="font-size: 0.73rem; color: #94a3b8;">hasil_jepretan/ (Setiap jepret otomatis tersimpan sebagai file .jpg)</span>
+              </div>
+            </div>
+            <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+              <button type="button" class="btn btn-secondary btn-sm" onclick="openCapturesFolder()" style="font-size: 0.74rem; padding: 5px 12px; width: auto; background: #1e293b; border: 1px solid #38bdf8; color: #ffffff;">
+                📂 Buka Folder di Laptop
+              </button>
+              <button type="button" class="btn btn-secondary btn-sm" onclick="importFromSdCard()" title="Cari foto di kartu SD/flashdisk kamera jika pernah jepret offline" style="font-size: 0.74rem; padding: 5px 12px; width: auto; background: #1e293b; border: 1px solid #475569; color: #cbd5e1;">
+                📥 Impor SD Card
+              </button>
             </div>
           </div>
         </div>
@@ -1494,6 +1543,50 @@ HTML_TEMPLATE = """
       }
     }
 
+    function toggleDigicamGuide() {
+      const guide = document.getElementById('digicamGuide');
+      if (guide) {
+        guide.style.display = guide.style.display === 'none' ? 'block' : 'none';
+      }
+    }
+
+    async function checkCameraHardwareStatus() {
+      try {
+        const res = await fetch('/api/check_cameras');
+        if (!res.ok) return;
+        const data = await res.json();
+        const notice = document.getElementById('digicamNotice');
+        if (notice) {
+          if (data.digicam_state === 'storage_mode') {
+            notice.style.display = 'block';
+          } else {
+            notice.style.display = 'none';
+          }
+        }
+      } catch (e) {
+        console.warn("Gagal cek status hardware kamera:", e);
+      }
+    }
+
+    async function refreshCameraDevices() {
+      const btn = document.getElementById('btnRefreshCam');
+      if (btn) {
+        btn.innerHTML = '⏳ Memindai...';
+        btn.disabled = true;
+      }
+      try {
+        await checkCameraHardwareStatus();
+        await updateCameraDeviceList();
+      } catch (err) {
+        console.warn("Refresh kamera error:", err);
+      } finally {
+        if (btn) {
+          btn.innerHTML = '🔄 Segarkan';
+          btn.disabled = false;
+        }
+      }
+    }
+
     async function updateCameraDeviceList() {
       const sel = document.getElementById('cameraSourceSelect');
       if (!sel || !navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return;
@@ -1510,14 +1603,18 @@ HTML_TEMPLATE = """
           opt.value = dev.deviceId;
           let label = dev.label || `Kamera ${idx + 1}`;
 
+          const isGeneral = /general-a-video|general|1b3f|genplus/i.test(label);
           const isLogi = /logi|c270|c920|c922|brio/i.test(label);
           const isIriun = /iriun/i.test(label);
           const isDroid = /droid/i.test(label);
           const isCamo = /camo|epoc/i.test(label);
-          const isInternal = /integrated|built-in|pc camera/i.test(label);
+          const isInternal = /1bcf:28c4|integrated|built-in|pc camera/i.test(label);
           const isUsb = /usb/i.test(label);
 
-          if (isLogi) {
+          if (isGeneral) {
+            label = "📷 " + label + " (Kamera Saku / Digicam USB)";
+            if (autoPickIdx === -1) autoPickIdx = idx;
+          } else if (isLogi) {
             label = "🎥 " + label + " (Logitech Eksternal HD)";
             if (autoPickIdx === -1) autoPickIdx = idx;
           } else if (isUsb && !isInternal) {
@@ -1536,7 +1633,7 @@ HTML_TEMPLATE = """
           sel.appendChild(opt);
         });
 
-        // Otomatis prioritaskan Logitech / USB eksternal jika pengguna belum memilih kamera tertentu
+        // Otomatis prioritaskan Digicam/USB eksternal jika pengguna belum memilih kamera tertentu
         if (!currentCameraDeviceId && autoPickIdx !== -1) {
           sel.selectedIndex = autoPickIdx;
           currentCameraDeviceId = videoDevices[autoPickIdx].deviceId;
@@ -1548,6 +1645,7 @@ HTML_TEMPLATE = """
 
     if (navigator.mediaDevices && typeof navigator.mediaDevices.addEventListener === 'function') {
       navigator.mediaDevices.addEventListener('devicechange', async () => {
+        await checkCameraHardwareStatus();
         await updateCameraDeviceList();
       });
     }
@@ -1567,41 +1665,68 @@ HTML_TEMPLATE = """
       const video = document.getElementById('cameraVideo');
       wrapper.style.display = 'block';
       document.body.classList.add('camera-live-active');
+      checkCameraHardwareStatus();
+
+      // Hentikan stream yang sedang berjalan terlebih dahulu
+      if (cameraStream) {
+        cameraStream.getTracks().forEach(track => track.stop());
+        cameraStream = null;
+      }
 
       try {
-        // Jika belum ada kamera terpilih, cari kamera eksternal (Logitech/USB) terlebih dahulu
-        if (!preferredDeviceId && !currentCameraDeviceId && navigator.mediaDevices.enumerateDevices) {
+        let targetId = preferredDeviceId || currentCameraDeviceId;
+        if (!targetId && navigator.mediaDevices && navigator.mediaDevices.enumerateDevices) {
           try {
             const devices = await navigator.mediaDevices.enumerateDevices();
             const videoDevices = devices.filter(d => d.kind === 'videoinput');
-            const extCam = videoDevices.find(d => /logi|c270|c920|c922|brio|usb/i.test(d.label) && !/integrated|built-in|pc camera/i.test(d.label));
+            const extCam = videoDevices.find(d => 
+              /general|genplus|1b3f|logi|c270|c920|c922|brio|teleskop|eyepiece|usb/i.test(d.label) &&
+              !/1bcf:28c4|integrated|built-in/i.test(d.label)
+            );
             if (extCam && extCam.deviceId) {
-              currentCameraDeviceId = extCam.deviceId;
+              targetId = extCam.deviceId;
+              currentCameraDeviceId = targetId;
             }
           } catch (e) {}
         }
 
-        const targetId = preferredDeviceId || currentCameraDeviceId;
-        const videoConstraints = {
-          width: { ideal: 1280, min: 640 },
-          height: { ideal: 720, min: 480 },
-          frameRate: { ideal: 30, max: 30 }
-        };
+        let constraints;
         if (targetId) {
-          videoConstraints.deviceId = { exact: targetId };
+          constraints = {
+            video: {
+              deviceId: { exact: targetId },
+              width: { ideal: 1280 },
+              height: { ideal: 720 }
+            },
+            audio: false
+          };
         } else {
-          videoConstraints.facingMode = { ideal: "environment" };
+          constraints = {
+            video: {
+              width: { ideal: 1280 },
+              height: { ideal: 720 },
+              facingMode: { ideal: "environment" }
+            },
+            audio: false
+          };
         }
 
-        cameraStream = await navigator.mediaDevices.getUserMedia({
-          video: videoConstraints,
-          audio: false
-        });
+        try {
+          cameraStream = await navigator.mediaDevices.getUserMedia(constraints);
+        } catch (strictErr) {
+          console.warn("Kamera gagal dengan constraint ideal, mencoba konfigurasi fleksibel:", strictErr);
+          cameraStream = await navigator.mediaDevices.getUserMedia({
+            video: targetId ? { deviceId: targetId } : true,
+            audio: false
+          });
+        }
+
         video.srcObject = cameraStream;
         video.onloadedmetadata = () => {
-          video.play();
+          video.play().catch(e => console.warn(e));
           drawLiveHudLoop();
           updateCameraDeviceList();
+          checkCameraHardwareStatus();
         };
       } catch (err) {
         alert("Tidak dapat membuka kamera: " + err.message + ". Pastikan izin kamera browser diaktifkan atau kamera tidak sedang dipakai aplikasi lain.");
@@ -1782,95 +1907,144 @@ HTML_TEMPLATE = """
           ctx.shadowBlur = 0;
 
           // ==========================================================
-          // 2. WATERPASS TENGAH KAMERA HP (PITCH LADDER + GARIS PENDEK)
+          // 2. BAR VERTIKAL DERAJAT KEMIRINGAN (ELEVASI / TILT) DI SISI KIRI
           // ==========================================================
-          // Seperti pada kamera handphone: lingkaran dengan garis pendek di tengah.
-          // Saat pas lurus (0.0°), indikator berubah menjadi warna KUNING terang.
-          const R = 42 * scale; // Radius lingkaran bidik tengah
+          // Menggantikan lingkaran di tengah menjadi pita bar derajat vertikal di sisi kiri layar
+          // persis seperti pita kompas horizontal di bagian atas layar.
+          const vBarX = 46 * scale; // Garis baseline vertikal di kiri layar
+          const vBarTop = tapeY + tapeH + (32 * scale); // Di bawah pita kompas atas
+          const vBarBot = h - (36 * scale); // Di atas kontrol shutter bawah
+          const vBarH = vBarBot - vBarTop;
 
-          // A. Lingkaran luar (Center Housing Ring)
-          ctx.beginPath();
-          ctx.arc(cx, cy, R, 0, 2 * Math.PI);
-          ctx.strokeStyle = isLevel ? "#facc15" : "rgba(255, 255, 255, 0.35)";
-          ctx.lineWidth = 1.5 * scale;
-          if (isLevel) {
-            ctx.shadowColor = "rgba(250, 204, 21, 0.85)";
-            ctx.shadowBlur = 8 * scale;
-          }
-          ctx.stroke();
-          ctx.shadowBlur = 0;
-
-          // B. Sayap horizontal luar di kiri (9 o'clock) & kanan (3 o'clock)
-          const wingLen = 14 * scale;
-          ctx.strokeStyle = isLevel ? "#facc15" : "rgba(255, 255, 255, 0.65)";
-          ctx.lineWidth = isLevel ? 2.5 * scale : 1.8 * scale;
-          ctx.beginPath();
-          ctx.moveTo(cx - R - wingLen, cy);
-          ctx.lineTo(cx - R - (2 * scale), cy);
-          ctx.moveTo(cx + R + (2 * scale), cy);
-          ctx.lineTo(cx + R + wingLen, cy);
-          ctx.stroke();
-
-          // C. Tangga tick horizontal (Pitch Ladder Graduations) di dalam lingkaran
-          const ladderSteps = [
-            { dy: -20 * scale, w: 26 * scale },
-            { dy: -10 * scale, w: 16 * scale },
-            { dy: 0,           w: 22 * scale },
-            { dy: 10 * scale,  w: 16 * scale },
-            { dy: 20 * scale,  w: 26 * scale }
-          ];
+          ctx.save();
+          // Baseline garis vertikal di sisi kiri layar
           ctx.strokeStyle = "rgba(255, 255, 255, 0.25)";
           ctx.lineWidth = 1 * scale;
-          for (let step of ladderSteps) {
-            ctx.beginPath();
-            ctx.moveTo(cx - (step.w / 2), cy + step.dy);
-            ctx.lineTo(cx + (step.w / 2), cy + step.dy);
-            ctx.stroke();
-          }
-
-          // D. GARIS VERTIKAL PENDEK DI TENGAH (BERUBAH POSISI SESUAI TILT)
-          // Bergeser naik/turun di dalam lingkaran mengikuti sudut tilt kamera.
-          // Saat pas lurus (0.0°), tepat di tengah dan berubah WARNA KUNING terang.
-          const maxPitch = 24 * scale;
-          const pitchShift = Math.max(-maxPitch, Math.min(maxPitch, curTilt * 3.0 * scale));
-          const markerY = isLevel ? cy : (cy - pitchShift);
-          const vertSegHalfLen = 10 * scale; // Panjang garis pendek ~20px
-
-          const markerColor = isLevel ? "#facc15" : "rgba(255, 255, 255, 0.95)";
-          ctx.strokeStyle = markerColor;
-          ctx.lineWidth = isLevel ? 3 * scale : 2 * scale;
-          if (isLevel) {
-            ctx.shadowColor = "rgba(250, 204, 21, 0.9)";
-            ctx.shadowBlur = 10 * scale;
-          }
-
           ctx.beginPath();
-          ctx.moveTo(cx, markerY - vertSegHalfLen);
-          ctx.lineTo(cx, markerY + vertSegHalfLen);
+          ctx.moveTo(vBarX, vBarTop);
+          ctx.lineTo(vBarX, vBarBot);
           ctx.stroke();
 
-          // Crossbar horizontal kecil di garis pendek
-          const crossHalf = isLevel ? (7 * scale) : (5 * scale);
-          ctx.beginPath();
-          ctx.moveTo(cx - crossHalf, markerY);
-          ctx.lineTo(cx + crossHalf, markerY);
-          ctx.stroke();
-          ctx.shadowBlur = 0;
+          // Skala derajat bergerak live mengikuti sudut curTilt
+          // Rentang pandang vertikal: 40 derajat
+          const vFovDeg = 40;
+          const pxPerDegV = vBarH / vFovDeg;
+          const startPitch = Math.floor(curTilt - (vFovDeg / 2) - 2);
+          const endPitch = Math.ceil(curTilt + (vFovDeg / 2) + 2);
 
-          // E. Teks Derajat & Status di Atas Lingkaran
-          ctx.textAlign = "center";
+          for (let p = startPitch; p <= endPitch; p++) {
+            // Dalam fisika optik: sudut positif (menengadah ke langit) berada di atas cy
+            const yPos = cy - (p - curTilt) * pxPerDegV;
+            if (yPos < vBarTop || yPos > vBarBot) continue;
+
+            if (p === 0) {
+              // 0.0° UFUK MAR'I / LEVEL (WARNA HIJAU EMERALD / EMAS TERANG)
+              ctx.strokeStyle = isLevel ? "#10b981" : "#38bdf8";
+              ctx.lineWidth = 2.5 * scale;
+              ctx.beginPath();
+              ctx.moveTo(vBarX - (22 * scale), yPos);
+              ctx.lineTo(vBarX + (8 * scale), yPos);
+              ctx.stroke();
+
+              ctx.fillStyle = isLevel ? "#34d399" : "#38bdf8";
+              ctx.font = `bold ${Math.round(11 * scale)}px sans-serif`;
+              ctx.textAlign = "right";
+              ctx.shadowColor = "rgba(0, 0, 0, 0.9)";
+              ctx.shadowBlur = 4;
+              ctx.fillText("0° UFUK", vBarX - (26 * scale), yPos + (4 * scale));
+              ctx.shadowBlur = 0;
+            } else if (p % 10 === 0) {
+              // Garis mayor setiap 10°
+              ctx.strokeStyle = "rgba(226, 232, 240, 0.85)";
+              ctx.lineWidth = 1.4 * scale;
+              ctx.beginPath();
+              ctx.moveTo(vBarX - (16 * scale), yPos);
+              ctx.lineTo(vBarX + (4 * scale), yPos);
+              ctx.stroke();
+
+              ctx.fillStyle = "#cbd5e1";
+              ctx.font = `bold ${Math.round(10 * scale)}px monospace`;
+              ctx.textAlign = "right";
+              ctx.shadowColor = "rgba(0, 0, 0, 0.9)";
+              ctx.shadowBlur = 3;
+              const signStr = p > 0 ? `+${p}°` : `${p}°`;
+              ctx.fillText(signStr, vBarX - (18 * scale), yPos + (3.5 * scale));
+              ctx.shadowBlur = 0;
+            } else if (p % 5 === 0) {
+              // Garis menengah setiap 5°
+              ctx.strokeStyle = "rgba(255, 255, 255, 0.55)";
+              ctx.lineWidth = 1 * scale;
+              ctx.beginPath();
+              ctx.moveTo(vBarX - (10 * scale), yPos);
+              ctx.lineTo(vBarX, yPos);
+              ctx.stroke();
+            } else {
+              // Garis mikro per 1°
+              ctx.strokeStyle = "rgba(255, 255, 255, 0.22)";
+              ctx.lineWidth = 0.8 * scale;
+              ctx.beginPath();
+              ctx.moveTo(vBarX - (5 * scale), yPos);
+              ctx.lineTo(vBarX, yPos);
+              ctx.stroke();
+            }
+          }
+          ctx.restore();
+
+          // Jarum penunjuk tetap di tengah tinggi layar (Segitiga ▶ menunjuk baseline)
+          ctx.save();
+          ctx.beginPath();
+          ctx.moveTo(vBarX + (3 * scale), cy);
+          ctx.lineTo(vBarX + (13 * scale), cy - (6 * scale));
+          ctx.lineTo(vBarX + (13 * scale), cy + (6 * scale));
+          ctx.closePath();
+          ctx.fillStyle = isLevel ? "#10b981" : "#38bdf8";
           ctx.shadowColor = "rgba(0, 0, 0, 0.9)";
           ctx.shadowBlur = 4;
+          ctx.fill();
+          ctx.shadowBlur = 0;
+
+          // Label Nilai Derajat Kemiringan Vertikal Digital di samping jarum penunjuk
+          ctx.fillStyle = isLevel ? "#34d399" : "#ffffff";
+          ctx.font = `bold ${Math.round(12 * scale)}px monospace`;
+          ctx.textAlign = "left";
+          ctx.shadowColor = "rgba(0, 0, 0, 0.9)";
+          ctx.shadowBlur = 4;
+          const tiltPrefix = curTilt > 0 ? "+" : "";
+          const levelText = isLevel ? "🎯 LEVEL" : (curTilt > 0 ? "▲ LANGIT" : "▼ BUMI");
+          ctx.fillText(`${tiltPrefix}${curTilt.toFixed(1)}° (${levelText})`, vBarX + (17 * scale), cy + (4 * scale));
+          ctx.shadowBlur = 0;
+          ctx.restore();
+
+          // ==========================================================
+          // 3. RETIKEL TITIK BIDIK TELESKOP BERSIH DI TENGAH LAYAR
+          // ==========================================================
+          // Menggantikan lingkaran besar dengan crosshair optik bersih tanpa menutupi ufuk
+          const chGap = 6 * scale;
+          const chLen = 16 * scale;
+          ctx.strokeStyle = isLevel ? "#10b981" : "rgba(56, 189, 248, 0.75)";
+          ctx.lineWidth = isLevel ? 1.8 * scale : 1.2 * scale;
           if (isLevel) {
-            ctx.fillStyle = "#facc15";
-            ctx.font = `bold ${Math.round(13 * scale)}px sans-serif`;
-            ctx.fillText("● 0.0° LURUS (LEVEL)", cx, cy - R - (12 * scale));
-          } else {
-            ctx.fillStyle = "#ffffff";
-            ctx.font = `bold ${Math.round(11 * scale)}px monospace`;
-            const tiltDir = curTilt > 0 ? "▼ Turunkan" : "▲ Naikkan";
-            ctx.fillText(`${curTilt > 0 ? "+" : ""}${curTilt.toFixed(1)}° (${tiltDir})`, cx, cy - R - (12 * scale));
+            ctx.shadowColor = "rgba(16, 185, 129, 0.8)";
+            ctx.shadowBlur = 6 * scale;
           }
+          ctx.beginPath();
+          // Garis horizontal kiri & kanan
+          ctx.moveTo(cx - chGap - chLen, cy);
+          ctx.lineTo(cx - chGap, cy);
+          ctx.moveTo(cx + chGap, cy);
+          ctx.lineTo(cx + chGap + chLen, cy);
+          // Garis vertikal atas & bawah
+          ctx.moveTo(cx, cy - chGap - chLen);
+          ctx.lineTo(cx, cy - chGap);
+          ctx.moveTo(cx, cy + chGap);
+          ctx.lineTo(cx, cy + chGap + chLen);
+          ctx.stroke();
+
+          // Titik pusat bidik mikro di cx, cy
+          ctx.beginPath();
+          ctx.arc(cx, cy, 1.8 * scale, 0, 2 * Math.PI);
+          ctx.fillStyle = isLevel ? "#34d399" : "#38bdf8";
+          ctx.fill();
           ctx.shadowBlur = 0;
 
           // F. Status Sensor Hardware Badge di Pojok Kiri Atas Kamera
@@ -1937,10 +2111,109 @@ HTML_TEMPLATE = """
       const ctx = hiddenCanvas.getContext('2d');
       ctx.drawImage(video, 0, 0, hiddenCanvas.width, hiddenCanvas.height);
 
-      const b64 = hiddenCanvas.toDataURL('image/jpeg', 0.86);
-      setPhotoToSlot(activeSlotIndex, b64, "Jepretan Kamera Live");
+      const b64 = hiddenCanvas.toDataURL('image/jpeg', 0.95);
+      const slotNum = activeSlotIndex + 1;
+      setPhotoToSlot(activeSlotIndex, b64, `Jepretan Kamera (Slot ${slotNum})`);
       stopLiveCamera();
+
+      // Dapatkan azimuth saat ini
+      const azVal = (typeof currentLiveCompassAzimuth !== 'undefined' && currentLiveCompassAzimuth !== null) ? currentLiveCompassAzimuth : (parseFloat(document.getElementById('inpAzimuth')?.value) || 270.0);
+
+      // Simpan langsung ke folder 'hasil_jepretan' di disk laptop
+      const lbl = document.getElementById('lblLastSavedCapture');
+      if (lbl) {
+        lbl.innerHTML = `⏳ Sedang menyimpan file ke <b>hasil_jepretan/</b>...`;
+      }
+
+      fetch('/api/save_capture', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          image_base64: b64,
+          slot_index: activeSlotIndex,
+          azimuth: azVal
+        })
+      })
+      .then(r => r.json())
+      .then(res => {
+        if (res.status === 'success') {
+          if (lbl) {
+            lbl.innerHTML = `Tersimpan: <b style="color: #4ade80;">${res.filename}</b> (${res.size_kb} KB, ${res.resolution}) di <b>hasil_jepretan/</b>`;
+          }
+        } else {
+          if (lbl) lbl.innerText = "Gagal simpan: " + (res.message || "Error");
+        }
+      })
+      .catch(e => {
+        console.warn("Gagal simpan capture:", e);
+        if (lbl) lbl.innerText = "Error menyimpan file jepretan";
+      });
     }
+
+    async function openCapturesFolder() {
+      try {
+        const res = await fetch('/api/open_captures_folder', { method: 'POST' });
+        const data = await res.json();
+        if (data.status === 'success') {
+          console.log("Folder dibuka:", data.folder);
+        }
+      } catch (e) {
+        alert("Gagal membuka folder: " + e.message);
+      }
+    }
+
+    async function importFromSdCard() {
+      try {
+        const lbl = document.getElementById('lblLastSavedCapture');
+        if (lbl) lbl.innerHTML = "⏳ Memeriksa kartu SD / drive kamera...";
+        const res = await fetch('/api/import_sdcard_photos', { method: 'POST' });
+        const data = await res.json();
+        if (data.status === 'success') {
+          if (data.copied_count > 0) {
+            alert(`Berhasil mengimpor ${data.copied_count} foto dari kamera ke folder 'hasil_jepretan'!\n\nFile:\n${data.files.join('\n')}`);
+            if (lbl) {
+              lbl.innerHTML = `Berhasil impor <b style="color: #4ade80;">${data.copied_count} foto</b> dari SD card ke <b>hasil_jepretan/</b>`;
+            }
+            openCapturesFolder();
+          } else {
+            alert("Tidak ditemukan file foto baru di kartu SD kamera yang terpasang.\n\nTips: Saat kamera berada di mode Webcam, foto diambil menggunakan tombol 'AMBIL FRAME (SPASI)' dan otomatis tersimpan.");
+            if (lbl) {
+              lbl.innerHTML = `hasil_jepretan/ (Tidak ada foto baru di kartu SD)`;
+            }
+          }
+        }
+      } catch (e) {
+        alert("Gagal impor dari SD Card: " + e.message);
+      }
+    }
+
+    async function zeroCurrentTilt() {
+      try {
+        const res = await fetch('/api/compass/zero_tilt', { method: 'POST' });
+        const data = await res.json();
+        if (data.status === 'success') {
+          liveCompassTilt = data.tilt || 0.0;
+          const inp = document.getElementById('inpTilt');
+          if (inp) inp.value = (data.tilt || 0.0).toFixed(1);
+          alert(`🎯 Kalibrasi Kemiringan Sukses!\nPosisi kamera fisik saat ini berhasil dinolkan menjadi 0.0° Level (Datar).\nOffset tersimpan: ${data.tilt_offset}°`);
+        }
+      } catch (err) {
+        alert("Gagal mengalibrasi kemiringan: " + err.message);
+      }
+    }
+
+    // Tombol Spasi & Enter untuk memicu jepretan saat kamera live aktif
+    window.addEventListener('keydown', function(e) {
+      const liveWrapper = document.getElementById('liveCamWrapper');
+      if (liveWrapper && liveWrapper.style.display !== 'none') {
+        const activeTag = document.activeElement ? document.activeElement.tagName.toUpperCase() : '';
+        if (activeTag === 'INPUT' || activeTag === 'TEXTAREA' || activeTag === 'SELECT') return;
+        if (e.code === 'Space' || e.key === ' ' || e.code === 'Enter') {
+          e.preventDefault();
+          captureLiveFrame();
+        }
+      }
+    });
 
     function getGPS() {
       if (!navigator.geolocation) {
@@ -2576,9 +2849,144 @@ HTML_TEMPLATE = """
 """
 
 
+@app.route("/api/check_cameras", methods=["GET"])
+def api_check_cameras():
+    result = {
+        "cameras": [],
+        "digicam_state": "not_detected",
+        "message": ""
+    }
+    try:
+        cmd = ["wmic", "path", "Win32_PnPEntity", "where", "DeviceID like \"%1B3F%\" and Status=\"OK\"", "get", "Caption,DeviceID", "/format:csv"]
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=3)
+        out = r.stdout
+        if "PID_2005" in out or "GENERAL-A-VIDEO" in out:
+            result["digicam_state"] = "ready"
+            result["message"] = "Kamera saku (GENERAL-A-VIDEO) aktif dalam mode Kamera PC/Webcam."
+        elif "PID_8301" in out or "Mass Storage" in out:
+            result["digicam_state"] = "storage_mode"
+            result["message"] = "Kamera saku terdeteksi dalam mode Penyimpanan Massal."
+
+        cmd_cam = ["wmic", "path", "Win32_PnPEntity", "where", "PNPClass=\"Camera\" and Status=\"OK\"", "get", "Caption,DeviceID", "/format:csv"]
+        r_cam = subprocess.run(cmd_cam, capture_output=True, text=True, timeout=3)
+        for line in r_cam.stdout.splitlines():
+            line = line.strip()
+            if not line or line.startswith("Node,") or line.startswith("Caption,"):
+                continue
+            parts = [p.strip() for p in line.split(",") if p.strip()]
+            if len(parts) >= 2:
+                caption = parts[1]
+                dev_id = parts[2] if len(parts) > 2 else ""
+                result["cameras"].append({"caption": caption, "device_id": dev_id})
+    except Exception as e:
+        result["error"] = str(e)
+    return jsonify(result)
+
+
+@app.route("/api/save_capture", methods=["POST"])
+def api_save_capture():
+    try:
+        data = request.get_json(force=True)
+        b64_data = data.get("image_base64", "")
+        slot_idx = int(data.get("slot_index", 0)) + 1
+        az_val = float(data.get("azimuth", 270.0))
+        
+        if not b64_data:
+            return jsonify({"status": "error", "message": "Tidak ada data gambar"}), 400
+        
+        if "," in b64_data:
+            b64_data = b64_data.split(",", 1)[1]
+            
+        img_bytes = base64.b64decode(b64_data)
+        np_arr = np.frombuffer(img_bytes, np.uint8)
+        img_bgr = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+        
+        if img_bgr is None:
+            return jsonify({"status": "error", "message": "Gagal decode gambar"}), 400
+            
+        h, w = img_bgr.shape[:2]
+        captures_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "hasil_jepretan")
+        os.makedirs(captures_dir, exist_ok=True)
+        
+        timestamp_str = time.strftime("%Y%m%d_%H%M%S")
+        filename = f"jepretan_{timestamp_str}_Slot{slot_idx}_az{az_val:.1f}.jpg"
+        filepath = os.path.join(captures_dir, filename)
+        
+        # Simpan dengan kualitas JPEG tinggi (95)
+        cv2.imwrite(filepath, img_bgr, [int(cv2.IMWRITE_JPEG_QUALITY), 95])
+        file_size_kb = round(os.path.getsize(filepath) / 1024, 1)
+        
+        return jsonify({
+            "status": "success",
+            "filename": filename,
+            "filepath": filepath,
+            "relative_path": f"hasil_jepretan/{filename}",
+            "resolution": f"{w}x{h}",
+            "size_kb": file_size_kb,
+            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")
+        })
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route("/api/open_captures_folder", methods=["POST", "GET"])
+def api_open_captures_folder():
+    captures_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "hasil_jepretan")
+    os.makedirs(captures_dir, exist_ok=True)
+    try:
+        if sys.platform.startswith("win"):
+            os.startfile(captures_dir)
+        elif sys.platform.startswith("darwin"):
+            subprocess.run(["open", captures_dir])
+        else:
+            subprocess.run(["xdg-open", captures_dir])
+        return jsonify({"status": "success", "folder": captures_dir})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route("/api/import_sdcard_photos", methods=["POST", "GET"])
+def api_import_sdcard_photos():
+    captures_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "hasil_jepretan")
+    os.makedirs(captures_dir, exist_ok=True)
+    copied = []
+    import shutil
+    
+    for letter in "EFGHIJKLMNOPQRSTUVWXYZ":
+        root_path = f"{letter}:\\"
+        if os.path.exists(root_path):
+            dcim_path = os.path.join(root_path, "DCIM")
+            search_dir = dcim_path if os.path.exists(dcim_path) else root_path
+            try:
+                for root, _, files in os.walk(search_dir):
+                    for f in files:
+                        if f.lower().endswith((".jpg", ".jpeg", ".png")):
+                            src = os.path.join(root, f)
+                            dst_name = f"sdcard_{f}"
+                            dst = os.path.join(captures_dir, dst_name)
+                            if not os.path.exists(dst):
+                                shutil.copy2(src, dst)
+                                copied.append(dst_name)
+            except Exception:
+                pass
+    return jsonify({"status": "success", "copied_count": len(copied), "files": copied})
+
+
 @app.route("/api/compass", methods=["GET"])
 def api_compass():
     return jsonify(compass_service.get_data())
+
+
+@app.route("/api/compass/zero_tilt", methods=["POST", "GET"])
+def api_compass_zero_tilt():
+    new_offset = compass_service.set_zero_tilt()
+    cur_data = compass_service.get_data()
+    return jsonify({
+        "status": "success",
+        "tilt_offset": new_offset,
+        "tilt": cur_data.get("tilt", 0.0),
+        "message": f"Kemiringan berhasil dinolkan (Offset {new_offset:.1f}° disimpan sebagai 0.0° Level)"
+    })
 
 
 @app.route("/")
