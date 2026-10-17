@@ -1897,7 +1897,7 @@ HTML_TEMPLATE = """
           const h = canvas.height;
           ctx.clearRect(0, 0, w, h);
 
-          const cy = h / 2.0;
+          const cy = (h / 2.0) + (h * 0.0516); // Titik acuan level 0° dan crosshair tengah diturunkan pas ke garis acuan fisik (garis hitam)
           const cx = w / 2.0;
           const scale = Math.max(1, w / 960);
 
@@ -2154,8 +2154,7 @@ HTML_TEMPLATE = """
           const tiltPrefix = curTilt > 0 ? "+" : (curTilt < 0 ? "-" : "");
           const absTilt = Math.abs(curTilt);
           const liveTiltCm = getElevCmStr(absTilt);
-          const levelText = isLevel ? "🎯 LEVEL" : (curTilt > 0 ? "▲ LANGIT" : "▼ BUMI");
-          ctx.fillText(`${tiltPrefix}${absTilt.toFixed(1)}°/${liveTiltCm}cm (${levelText})`, vBarX + (17 * scale), cy + (4 * scale));
+          ctx.fillText(`${tiltPrefix}${absTilt.toFixed(1)}°/${liveTiltCm}cm`, vBarX + (17 * scale), cy + (4 * scale));
           ctx.shadowBlur = 0;
           ctx.restore();
 
