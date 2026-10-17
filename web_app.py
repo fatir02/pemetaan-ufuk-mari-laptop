@@ -3139,81 +3139,82 @@ def api_sample_image():
 
 
 def fast_render_plot_image(azimuths, elevations, dip_deg, target_az=None, target_alt=None):
-    """Render kurva profil 2D menggunakan OpenCV murni (30 ms vs 2400 ms Matplotlib)."""
-    W, H = 680, 310
-    img = np.full((H, W, 3), (42, 27, 19), dtype=np.uint8)
-    
-    lm, rm, tm, bm = 55, 20, 28, 40
-    pw = W - lm - rm
-    ph = H - tm - bm
-    
-    cv2.rectangle(img, (lm, tm), (lm + pw, tm + ph), (23, 15, 11), -1)
-    
-    az_min = float(azimuths[0])
-    az_max = float(azimuths[-1])
-    min_y = 0.0
-    max_y = 40.0
-    if float(np.min(elevations)) < -0.5:
-        min_y = -10.0
-    
-    def to_screen(az, el):
-        x = lm + int((az - az_min) / (az_max - az_min + 1e-6) * pw)
-        y = tm + int((max_y - el) / (max_y - min_y + 1e-6) * ph)
-        return x, y
+    """Render kurva profil 2D menggunakan Matplotlib Agg berresolusi tinggi dan presisi falak."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
 
-    # Grid Elevasi vertikal sampai 40 derajat (interval 5 derajat)
-    for el_val in np.arange(min_y, max_y + 0.1, 5.0):
-        _, sy = to_screen(az_min, el_val)
-        if tm <= sy <= tm + ph:
-            is_major = (el_val % 10 == 0)
-            cv2.line(img, (lm, sy), (lm + pw, sy), (65, 48, 38) if is_major else (45, 32, 24), 1)
-            sign = '+' if el_val > 0 else ''
-            cv2.putText(img, f'{sign}{el_val:.0f}*', (12, sy + 4), cv2.FONT_HERSHEY_SIMPLEX, 0.34, (200, 180, 160) if is_major else (140, 120, 105), 1, cv2.LINE_AA)
+    CALIB_DEG_CM = {
+        0: "0,00", 1: "0,52", 2: "1,04", 3: "1,57", 4: "2,09",
+        5: "2,62", 6: "3,15", 7: "3,68", 8: "4,21", 9: "4,75",
+        10: "5,28", 11: "5,83", 12: "6,37", 13: "6,92", 14: "7,47",
+        15: "8,03", 16: "8,60", 17: "9,17", 18: "9,74", 19: "10,32", 20: "10,91"
+    }
 
-    # Grid Azimut horizontal (selisih 60 derajat, e.g. 240 s.d 300)
+    fig, ax = plt.subplots(figsize=(8.0, 3.4), dpi=120)
+    fig.patch.set_facecolor("#0f172a")
+    ax.set_facecolor("#020617")
+
+    az_arr = np.asarray(azimuths)
+    el_arr = np.asarray(elevations)
+
+    # Kurva Kontur Ufuk Mar'i (Garis Merah dan Area Arsiran mulai dari 0°)
+    c_curve = "#ef4444"
+    ax.plot(az_arr, el_arr, color=c_curve, linewidth=2.2, label="Kontur Ufuk Mar'i")
+    ax.fill_between(az_arr, np.maximum(0, el_arr), 0, color=c_curve, alpha=0.22)
+
+    # Titik sasaran jika ada
+    if target_az is not None:
+        t_alt = float(target_alt) if target_alt is not None else 0.0
+        c_target = "#d946ef"
+        ax.axvline(target_az, color=c_target, linestyle="-.", linewidth=1.5, label=f"Azimut Sasaran ({target_az:.2f}°)")
+        ax.scatter([target_az], [t_alt], color=c_target, s=60, zorder=5)
+        ax.scatter([target_az], [t_alt], color="#ffffff", s=20, zorder=6)
+        ax.annotate(
+            f"Halangan: {t_alt:+.2f}°",
+            xy=(target_az, t_alt),
+            xytext=(target_az + 0.35, t_alt + 0.5),
+            fontsize=8,
+            fontweight="bold",
+            color="#fae8ff",
+            bbox=dict(boxstyle="round,pad=0.25", facecolor="#1e1b4b", edgecolor="#c026d3", alpha=0.9),
+        )
+
+    # Skala sumbu X (Azimut 240 s.d 300)
+    az_min = float(az_arr[0])
+    az_max = float(az_arr[-1])
+    ax.set_xlim(az_min, az_max)
     if abs((az_max - az_min) - 60.0) < 5.0 and abs(az_min - 240.0) < 5.0:
-        az_ticks = [240.0, 250.0, 260.0, 270.0, 280.0, 290.0, 300.0]
+        x_ticks = [240.0, 250.0, 260.0, 270.0, 280.0, 290.0, 300.0]
     else:
         az_step = 10.0 if (az_max - az_min) >= 30.0 else 5.0
-        az_ticks = list(np.arange(np.ceil(az_min / az_step) * az_step, az_max + 0.1, az_step))
-        if not any(abs(t - az_min) < 1.0 for t in az_ticks):
-            az_ticks.insert(0, az_min)
-        if not any(abs(t - az_max) < 1.0 for t in az_ticks):
-            az_ticks.append(az_max)
+        x_ticks = list(np.arange(np.ceil(az_min / az_step) * az_step, az_max + 0.1, az_step))
+        if not any(abs(t - az_min) < 1.0 for t in x_ticks):
+            x_ticks.insert(0, az_min)
+        if not any(abs(t - az_max) < 1.0 for t in x_ticks):
+            x_ticks.append(az_max)
+    x_labels = [f"{x:.0f}° (Barat)" if abs(x - 270.0) < 0.2 else f"{x:.0f}°" for x in x_ticks]
+    ax.set_xticks(x_ticks)
+    ax.set_xticklabels(x_labels, fontsize=8, color="#cbd5e1")
 
-    for az_val in az_ticks:
-        sx, _ = to_screen(az_val, min_y)
-        if lm <= sx <= lm + pw:
-            is_center = (abs(az_val - 270.0) < 0.2)
-            cv2.line(img, (sx, tm), (sx, tm + ph), (80, 60, 45) if is_center else (55, 40, 30), 1)
-            cv2.putText(img, f'{az_val:.0f}*', (sx - 14, tm + ph + 18), cv2.FONT_HERSHEY_SIMPLEX, 0.33, (248, 189, 56) if is_center else (184, 163, 148), 1, cv2.LINE_AA)
+    # Skala sumbu Y (Elevasi 0 s.d 20 derajat) + cm sesuai kalibrasi acuan falak 30cm
+    ax.set_ylim(0.0, 20.0)
+    y_ticks = [0, 5, 10, 15, 20]
+    y_labels = [f"+{y}° / {CALIB_DEG_CM[y]} cm" if y > 0 else "0° / 0,00 cm" for y in y_ticks]
+    ax.set_yticks(y_ticks)
+    ax.set_yticklabels(y_labels, fontsize=8, color="#f8fafc")
 
-    # Garis Ufuk Hakiki dan Ufuk Laut Dip ditiadakan sesuai permintaan
+    ax.set_xlabel("Rentang Azimut Bidikan (°)", fontsize=8.5, fontweight="bold", color="#94a3b8")
+    ax.set_ylabel("Sudut Elevasi / Skala Falak (° / cm)", fontsize=8.5, fontweight="bold", color="#94a3b8")
+    ax.set_title("Kurva Profil Elevasi Ufuk Mar'i vs Azimut", fontsize=9.5, fontweight="bold", color="#38bdf8", pad=6)
+    ax.grid(True, linestyle="--", alpha=0.4, color="#334155")
+    ax.legend(loc="upper right", fontsize=7.5, framealpha=0.85)
+    plt.tight_layout()
 
-    step = max(1, len(azimuths) // pw)
-    pts = [to_screen(azimuths[i], elevations[i]) for i in range(0, len(azimuths), step)]
-    if len(pts) > 1:
-        pts_arr = np.array(pts, dtype=np.int32)
-        poly = np.vstack([pts_arr, [lm + pw, tm + ph], [lm, tm + ph]])
-        overlay = img.copy()
-        cv2.fillPoly(overlay, [poly], (40, 20, 160))
-        cv2.addWeighted(overlay, 0.45, img, 0.55, 0, img)
-        cv2.polylines(img, [pts_arr], False, (82, 82, 255), 2, cv2.LINE_AA)
-
-    if target_az is not None:
-        t_alt_val = target_alt if target_alt is not None else 0.0
-        tx, ty = to_screen(target_az, t_alt_val)
-        tx = max(lm, min(lm + pw, tx))
-        ty = max(tm, min(tm + ph, ty))
-        cv2.line(img, (tx, tm), (tx, tm + ph), (251, 64, 224), 2, cv2.LINE_AA)
-        cv2.circle(img, (tx, ty), 5, (251, 64, 224), -1, cv2.LINE_AA)
-        cv2.circle(img, (tx, ty), 8, (255, 255, 255), 1, cv2.LINE_AA)
-
-    cv2.rectangle(img, (lm, tm), (lm + pw, tm + ph), (71, 49, 35), 1)
-    cv2.putText(img, 'Kurva Profil Elevasi Ufuk Mar-i vs Azimut', (lm, tm - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.40, (248, 189, 56), 1, cv2.LINE_AA)
-    
-    _, buf = cv2.imencode(".png", img)
-    return "data:image/png;base64," + base64.b64encode(buf).decode("utf-8")
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", facecolor=fig.get_facecolor(), dpi=120)
+    plt.close(fig)
+    return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode("utf-8")
 
 
 @app.route("/api/analyze", methods=["POST"])

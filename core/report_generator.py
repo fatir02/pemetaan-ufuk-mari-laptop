@@ -26,6 +26,7 @@ from reportlab.platypus import (
     Image as RLImage,
     KeepTogether,
     HRFlowable,
+    PageBreak,
 )
 
 from core.falak_calc import format_dms
@@ -67,7 +68,7 @@ def export_pdf_report(
     # Tulis overlay citra
     cv2.imwrite(temp_overlay_path, overlay_img_bgr)
 
-    # Render grafik profil ufuk khusus untuk laporan PDF (resolusi tajam 300 DPI)
+    # Render grafik profil ufuk khusus untuk laporan PDF (resolusi tajam 220 DPI)
     azimuths = profile_data["azimuths"]
     elevations = profile_data["elevations"]
 
@@ -75,44 +76,62 @@ def export_pdf_report(
     fig.patch.set_facecolor("#ffffff")
     ax.set_facecolor("#f9f9fb")
 
-    # Garis Ufuk Hakiki (0°)
-    ax.axhline(0, color="#1976d2", linestyle="--", linewidth=1.2, label="Ufuk Hakiki (0.00°)")
-
-    # Garis Kerendahan Ufuk Laut (-Dip)
-    if dip_deg > 0:
-        ax.axhline(-dip_deg, color="#ff8f00", linestyle=":", linewidth=1.3, label=f"Kerendahan Ufuk Laut (-{dip_deg:.2f}°)")
-
-    # Kurva Kontur Ufuk Mar'i
-    ax.plot(azimuths, elevations, color="#d32f2f", linewidth=2.0, label="Kontur Ufuk Mar'i")
-    ax.fill_between(azimuths, elevations, -10, color="#d32f2f", alpha=0.18)
+    # Kurva Kontur Ufuk Mar'i (Garis Merah dan Area Arsiran mulai dari 0°)
+    ax.plot(azimuths, elevations, color="#d32f2f", linewidth=2.2, label="Kontur Ufuk Mar'i")
+    ax.fill_between(azimuths, np.maximum(0, elevations), 0, color="#d32f2f", alpha=0.18)
 
     # Titik sasaran jika ada
     if target_analysis and "target_az" in target_analysis:
         t_az = target_analysis["target_az"]
         t_alt = target_analysis.get("alt_obstacle", target_analysis.get("target_alt", 0.0))
         ax.axvline(t_az, color="#7b1fa2", linestyle="-.", linewidth=1.5, label=f"Azimut Sasaran ({t_az:.2f}°)")
-        ax.scatter([t_az], [t_alt], color="#7b1fa2", s=70, zorder=5)
+        ax.scatter([t_az], [t_alt], color="#7b1fa2", s=65, zorder=5)
+        ax.scatter([t_az], [t_alt], color="#ffffff", s=20, zorder=6)
         ax.annotate(
             f"Halangan: {t_alt:+.2f}°",
             xy=(t_az, t_alt),
-            xytext=(t_az + 0.2, t_alt + 0.3),
+            xytext=(t_az + 0.35, t_alt + 0.5),
             fontsize=8,
             fontweight="bold",
             color="#4a148c",
-            bbox=dict(boxstyle="round,pad=0.2", facecolor="#ede7f6", edgecolor="#7b1fa2", alpha=0.9),
+            bbox=dict(boxstyle="round,pad=0.25", facecolor="#ede7f6", edgecolor="#7b1fa2", alpha=0.9),
         )
 
-    ax.set_xlim(azimuths[0], azimuths[-1])
-    # Batas sumbu Y dengan ruang nafas
-    y_min_plot = min(-dip_deg - 0.5, np.min(elevations) - 0.5, -1.0)
-    y_max_plot = max(np.max(elevations) + 0.8, 2.0)
-    ax.set_ylim(y_min_plot, y_max_plot)
+    # Skala sumbu X (Azimut 240 s.d 300)
+    az_min = float(azimuths[0])
+    az_max = float(azimuths[-1])
+    ax.set_xlim(az_min, az_max)
+    if abs((az_max - az_min) - 60.0) < 5.0 and abs(az_min - 240.0) < 5.0:
+        x_ticks = [240.0, 250.0, 260.0, 270.0, 280.0, 290.0, 300.0]
+    else:
+        az_step = 10.0 if (az_max - az_min) >= 30.0 else 5.0
+        x_ticks = list(np.arange(np.ceil(az_min / az_step) * az_step, az_max + 0.1, az_step))
+        if not any(abs(t - az_min) < 1.0 for t in x_ticks):
+            x_ticks.insert(0, az_min)
+        if not any(abs(t - az_max) < 1.0 for t in x_ticks):
+            x_ticks.append(az_max)
+    x_labels = [f"{x:.0f}° (Barat)" if abs(x - 270.0) < 0.2 else f"{x:.0f}°" for x in x_ticks]
+    ax.set_xticks(x_ticks)
+    ax.set_xticklabels(x_labels, fontsize=8)
+
+    # Skala sumbu Y (Elevasi 0 s.d 20 derajat) + cm sesuai kalibrasi acuan falak 30cm
+    ax.set_ylim(0.0, 20.0)
+    calib_deg_cm = {
+        0: "0,00", 1: "0,52", 2: "1,04", 3: "1,57", 4: "2,09",
+        5: "2,62", 6: "3,15", 7: "3,68", 8: "4,21", 9: "4,75",
+        10: "5,28", 11: "5,83", 12: "6,37", 13: "6,92", 14: "7,47",
+        15: "8,03", 16: "8,60", 17: "9,17", 18: "9,74", 19: "10,32", 20: "10,91"
+    }
+    y_ticks = [0, 5, 10, 15, 20]
+    y_labels = [f"+{y}° / {calib_deg_cm[y]} cm" if y > 0 else "0° / 0,00 cm" for y in y_ticks]
+    ax.set_yticks(y_ticks)
+    ax.set_yticklabels(y_labels, fontsize=8)
 
     ax.set_xlabel("Rentang Azimut Bidikan (°)", fontsize=9, fontweight="bold", color="#000000")
-    ax.set_ylabel("Sudut Elevasi / Ketinggian (°)", fontsize=9, fontweight="bold", color="#000000")
+    ax.set_ylabel("Sudut Elevasi / Skala Falak (° / cm)", fontsize=9, fontweight="bold", color="#000000")
     ax.set_title("Grafik Profil Elevasi Ufuk Mar'i terhadap Azimut Bidikan", fontsize=10, fontweight="bold", color="#000000", pad=6)
     ax.grid(True, linestyle="--", alpha=0.5, color="#bdbdbd")
-    ax.legend(loc="upper right", fontsize=7.5, framealpha=0.9)
+    ax.legend(loc="upper right", fontsize=8, framealpha=0.9)
     plt.tight_layout()
     fig.savefig(temp_plot_path, dpi=220)
     plt.close(fig)
@@ -235,28 +254,14 @@ def export_pdf_report(
         ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
     ]))
     elements.append(t_meta)
-    elements.append(Spacer(1, 8))
-
-    # BAGIAN VISUAL: FOTO OVERLAY & GRAFIK
-    elements.append(Paragraph("II. CITRA LAPANGAN & GRAFIK PROFIL KONTUR UFUK MAR'I", section_style))
-
-    # Tampilkan foto overlay dan grafik dengan ukuran yang pas di halaman A4
-    w_img = 490
-    h_img = 138
-    w_plot = 490
-    h_plot = 132
-
-    elements.append(RLImage(temp_overlay_path, width=w_img, height=h_img))
-    elements.append(Spacer(1, 3))
-    elements.append(RLImage(temp_plot_path, width=w_plot, height=h_plot))
-    elements.append(Spacer(1, 4))
+    elements.append(Spacer(1, 6))
 
     # TABEL 2: ANALISIS TITIK BIDIK SASARAN (Misal Azimut Hilal)
     elements.append(Paragraph("III. HASIL ANALISIS SUDUT HALANGAN UFUK PADA TITIK SASARAN", section_style))
 
     if target_analysis:
         t_az = target_analysis.get("target_az", az_center)
-        t_alt = target_analysis.get("alt_obstacle", 0.0)
+        t_alt = target_analysis.get("target_alt", target_analysis.get("alt_obstacle", 0.0))
         t_status = target_analysis.get("status", "Bebas Halangan")
         t_cat = target_analysis.get("category", "-")
         t_sev = target_analysis.get("severity", "Baik")
@@ -300,8 +305,8 @@ def export_pdf_report(
             ("BOX", (0, 0), (-1, -1), 0.8, colors.black),
             ("INNERGRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#cccccc")),
             ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-            ("TOPPADDING", (0, 0), (-1, -1), 2.5),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 2.5),
+            ("TOPPADDING", (0, 0), (-1, -1), 2),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
         ]))
         elements.append(t_analysis)
     else:
@@ -335,13 +340,13 @@ def export_pdf_report(
         ("BOX", (0, 0), (-1, -1), 0.8, colors.black),
         ("INNERGRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#cccccc")),
         ("VALIGN", (0, 0), (-1, -1), "TOP"),
-        ("TOPPADDING", (0, 0), (-1, -1), 3),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+        ("TOPPADDING", (0, 0), (-1, -1), 2.5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 2.5),
     ]))
     elements.append(t_rec)
-    elements.append(Spacer(1, 10))
+    elements.append(Spacer(1, 8))
 
-    # TANDA TANGAN PENGESAHAN
+    # TANDA TANGAN PENGESAHAN (Halaman 1)
     sig_table_data = [
         [
             Paragraph("Petugas Pengamat / Surveyor Falak,", ParagraphStyle("S1", parent=body_style, alignment=1, textColor=colors.black)),
@@ -362,6 +367,34 @@ def export_pdf_report(
         ("ALIGN", (0, 0), (-1, -1), "CENTER"),
     ]))
     elements.append(KeepTogether(t_sig))
+
+    # HALAMAN 2: LAMPIRAN VISUAL CITRA & GRAFIK PROFIL KONTUR UFUK MAR'I
+    elements.append(PageBreak())
+    elements.append(Paragraph("II. CITRA LAPANGAN & GRAFIK PROFIL KONTUR UFUK MAR'I", section_style))
+
+    # Tampilkan foto overlay dan grafik dengan ukuran dan resolusi proporsional mengikuti citra asli agar tidak gepeng/tertarik
+    orig_h, orig_w = overlay_img_bgr.shape[:2]
+    aspect_img = orig_h / max(1, orig_w)
+
+    w_img = 490.0
+    h_img = round(w_img * aspect_img)
+    max_h_img = 265.0
+    if h_img > max_h_img:
+        h_img = max_h_img
+        w_img = round(h_img / aspect_img)
+
+    w_plot = 490.0
+    h_plot = 200.0
+
+    img_flowable = RLImage(temp_overlay_path, width=w_img, height=h_img)
+    img_flowable.hAlign = "CENTER"
+    elements.append(img_flowable)
+    elements.append(Spacer(1, 6))
+
+    plot_flowable = RLImage(temp_plot_path, width=w_plot, height=h_plot)
+    plot_flowable.hAlign = "CENTER"
+    elements.append(plot_flowable)
+    elements.append(Spacer(1, 4))
 
     # Bangun PDF
     doc.build(elements)
