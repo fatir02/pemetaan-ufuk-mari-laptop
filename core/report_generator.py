@@ -156,7 +156,7 @@ def export_pdf_report(
 
     ax.set_xlabel("Rentang Azimut Bidikan (°)", fontsize=9, fontweight="bold", color="#000000")
     ax.set_ylabel("Sudut Elevasi / Skala Falak (° / cm)", fontsize=9, fontweight="bold", color="#000000")
-    ax.set_title("Grafik Profil Elevasi Ufuk Mar'i terhadap Azimut Bidikan", fontsize=10, fontweight="bold", color="#000000", pad=6)
+    ax.set_title("Grafik Elevasi vs Azimut", fontsize=10, fontweight="bold", color="#000000", pad=6)
     ax.grid(True, linestyle="--", alpha=0.5, color="#bdbdbd")
     ax.legend(loc="upper right", fontsize=8, framealpha=0.9)
     plt.tight_layout()
@@ -238,7 +238,7 @@ def export_pdf_report(
     elements.append(Spacer(1, 6))
 
     # TABEL 1: PARAMETER TITIK PENGAMATAN & OPTIK KAMERA
-    elements.append(Paragraph("I. PARAMETER GEOGRAFIS & SPESIFIKASI INSTRUMEN OPTIK", section_style))
+    elements.append(Paragraph("I. PARAMETER BIDIKAN", section_style))
 
     dms_lat = format_dms(latitude, is_lat=True)
     dms_lon = format_dms(longitude, is_lon=True)
@@ -280,7 +280,7 @@ def export_pdf_report(
     elements.append(Spacer(1, 4))
 
     # BAGIAN VISUAL: FOTO OVERLAY & GRAFIK (DIKEMBALIKAN KE BAGIAN II)
-    elements.append(Paragraph("II. CITRA LAPANGAN & GRAFIK PROFIL KONTUR UFUK MAR'I", section_style))
+    elements.append(Paragraph("II. CITRA & GRAFIK ", section_style))
 
     # Ukuran gambar di laporan sesuai dengan ukuran dan aspek rasio gambar hasil deteksi asli agar tidak gepeng/tertarik
     orig_h, orig_w = overlay_img_bgr.shape[:2]
@@ -310,7 +310,7 @@ def export_pdf_report(
     elements.append(PageBreak())
 
     # TABEL OBJEK HALANGAN MENONJOL (PROMINENT OBSTACLES)
-    elements.append(Paragraph("III. DAFTAR OBJEK HALANGAN MENONJOL PADA KONTUR UFUK MAR'I", section_style))
+    elements.append(Paragraph("III. DAFTAR OBJEK", section_style))
 
     body_center = ParagraphStyle("DocBodyCenter", parent=body_style, alignment=1)
     header_style = ParagraphStyle("DocHeaderCenter", parent=body_style, fontName="Helvetica-Bold", alignment=1)
@@ -360,7 +360,7 @@ def export_pdf_report(
     elements.append(Spacer(1, 14))
 
     # BAGIAN CATATAN & REKOMENDASI KELAYAKAN
-    elements.append(Paragraph("IV. REKOMENDASI KELAYAKAN LOKASI RUKYAT & CATATAN LAPANGAN", section_style))
+    elements.append(Paragraph("IV. CATATAN & REKOMENDASI", section_style))
 
     rec_content = recommendation_text.strip() if recommendation_text.strip() else (
         target_analysis.get("recommendation", "Lokasi memiliki keterbukaan ufuk yang baik.")
@@ -372,7 +372,7 @@ def export_pdf_report(
 
     rec_table_data = [
         [
-            Paragraph("<b>Nama Lokasi / Pos:</b>", body_style),
+            Paragraph("<b>Nama Lokasi</b>", body_style),
             Paragraph(location_name or "Pos Observasi Falak Lapangan", body_style),
         ],
         [
@@ -380,11 +380,11 @@ def export_pdf_report(
             Paragraph(obs_name_str, body_style),
         ],
         [
-            Paragraph("<b>Evaluasi Kelayakan Rukyat:</b>", body_style),
+            Paragraph("<b>Evaluasi</b>", body_style),
             Paragraph(rec_content, body_style),
         ],
         [
-            Paragraph("<b>Catatan Manual Pengamat:</b>", body_style),
+            Paragraph("<b>Catatan Pengamat:</b>", body_style),
             Paragraph(notes_content, body_style),
         ],
     ]
@@ -681,7 +681,7 @@ def export_excel_data(
             val_str = str(cell.value or "")
             if len(val_str) > max_len:
                 max_len = len(val_str)
-        ws.column_dimensions[col_letter].width = max(max_len + 4, 12)
+        ws.column_dimensions[col_letter].width = max(max_len + 8, 16)
 
     wb.save(output_excel_path)
     return output_excel_path
