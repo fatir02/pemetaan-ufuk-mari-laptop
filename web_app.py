@@ -1906,9 +1906,19 @@ HTML_TEMPLATE = """
           const h = canvas.height;
           ctx.clearRect(0, 0, w, h);
 
-          const cy = (h / 2.0) + (h * 0.0516); // Titik acuan level 0° dan crosshair tengah diturunkan pas ke garis acuan fisik (garis hitam)
-          const cx = w / 2.0;
           const scale = Math.max(1, w / 960);
+          const cx = w / 2.0;
+
+          const tapeY = 10 * scale;
+          const tapeH = 34 * scale;
+          const vBarTop = tapeY + tapeH + (32 * scale);
+          const vBarBot = h - (36 * scale);
+          const vBarH = vBarBot - vBarTop;
+          const vFovDeg = 47.0; // Kalibrasi rentang pandang vertikal (interval 20° pas dengan kaca atas & bawah)
+          const pxPerDegV = vBarH / vFovDeg;
+
+          // Titik acuan level 0° dan crosshair tengah dinaikkan 1 derajat (+1° / pxPerDegV) sesuai garis hitam fisik (gambar 15)
+          const cy = (h / 2.0) + (h * 0.0516) - (1.0 * pxPerDegV);
 
           const curAz = liveCompassConnected ? liveCompassAzimuth : (parseFloat(document.getElementById('inpAzimuth').value) || 270.0);
           const curTilt = liveCompassConnected ? liveCompassTilt : (parseFloat(document.getElementById('inpTilt').value) || 0.0);
@@ -1920,9 +1930,7 @@ HTML_TEMPLATE = """
           // ==========================================================
           const visibleFov = 64; // Menampilkan rentang derajat dari 240° (kiri) hingga 300° (kanan) saat bidik 270°
           const tapeW = Math.min(w * 0.72, 640 * scale); // Garis proporsional, rapi di tengah dan tidak penuh layar
-          const tapeH = 34 * scale;
           const tapeX = cx - (tapeW / 2); // Titik awal dihitung agar simetris di tengah
-          const tapeY = 10 * scale;
 
           ctx.save();
           // Baseline garis kompas horizontal sepanjang tapeW
@@ -2035,12 +2043,7 @@ HTML_TEMPLATE = """
           // ==========================================================
           // 2. BAR VERTIKAL DERAJAT KEMIRINGAN (ELEVASI / TILT) DI SISI KIRI
           // ==========================================================
-          // Menggantikan lingkaran di tengah menjadi pita bar derajat vertikal di sisi kiri layar
-          // persis seperti pita kompas horizontal di bagian atas layar.
           const vBarX = Math.round(112 * scale); // Garis baseline vertikal di kiri layar (memberi ruang untuk label derajat/cm)
-          const vBarTop = tapeY + tapeH + (32 * scale); // Di bawah pita kompas atas
-          const vBarBot = h - (36 * scale); // Di atas kontrol shutter bawah
-          const vBarH = vBarBot - vBarTop;
 
           ctx.save();
           // Baseline garis vertikal di sisi kiri layar
@@ -2052,9 +2055,6 @@ HTML_TEMPLATE = """
           ctx.stroke();
 
           // Skala derajat bergerak live mengikuti sudut curTilt
-          // Rentang pandang vertikal dikalibrasi presisi: 47.0 derajat (interval 20° pas dengan kaca atas & bawah)
-          const vFovDeg = 47.0;
-          const pxPerDegV = vBarH / vFovDeg;
           const startPitch = Math.floor(curTilt - (vFovDeg / 2) - 2);
           const endPitch = Math.ceil(curTilt + (vFovDeg / 2) + 2);
 
