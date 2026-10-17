@@ -253,20 +253,14 @@ def export_pdf_report(
         [
             Paragraph("<b>Lintang Tempat (phi):</b>", body_style),
             Paragraph(f"{dms_lat} ({latitude:+.5f}°)", body_style),
-            Paragraph("<b>Field of View (H / V):</b>", body_style),
-            Paragraph(f"{hfov:.1f}° / {vfov:.1f}°", body_style),
-        ],
-        [
-            Paragraph("<b>Bujur Tempat (lambda):</b>", body_style),
-            Paragraph(f"{dms_lon} ({longitude:+.5f}°)", body_style),
             Paragraph("<b>Rentang Azimut:</b>", body_style),
             Paragraph(f"{stats.get('az_range_min', 0):.2f}° s.d. {stats.get('az_range_max', 0):.2f}°", body_style),
         ],
         [
+            Paragraph("<b>Bujur Tempat (lambda):</b>", body_style),
+            Paragraph(f"{dms_lon} ({longitude:+.5f}°)", body_style),
             Paragraph("<b>Ketinggian Tempat (h):</b>", body_style),
             Paragraph(f"{elevation_m:.1f} m dpl", body_style),
-            Paragraph("<b>Kerendahan Ufuk (Dip):</b>", body_style),
-            Paragraph(f"{dip_deg:.3f}° ({profile_data.get('dip_arcmin', 0):.2f} menit busur)", body_style),
         ],
     ]
 
