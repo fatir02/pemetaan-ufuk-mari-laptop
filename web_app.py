@@ -992,9 +992,10 @@ HTML_TEMPLATE = """
           <div class="card visual-card">
             <div class="card-title">
               <span>📈 4. Kurva Profil Elevasi vs Azimuth</span>
+              <span style="font-size: 0.78rem; color: #38bdf8; font-weight: normal;">🎯 Klik garis merah / grafik untuk atur sasaran</span>
             </div>
-            <div class="img-wrapper" style="position: relative; background: #020617; border-radius: 8px; overflow: hidden; border: 1px solid #334155; text-align: center;">
-              <img id="resPlotImg" style="width: 100%; max-height: 400px; object-fit: contain; display: block;" alt="Grafik Profil Elevasi vs Azimuth">
+            <div class="img-wrapper" id="plotInteractiveWrapper" style="position: relative; background: #020617; border-radius: 8px; overflow: hidden; border: 1px solid #334155; text-align: center; cursor: crosshair;" title="Klik atau seret pada garis merah grafik untuk membidik azimut sasaran">
+              <img id="resPlotImg" style="width: 100%; max-height: 400px; object-fit: contain; display: block; user-select: none;" alt="Grafik Profil Elevasi vs Azimuth" draggable="false">
             </div>
           </div>
 
@@ -2920,6 +2921,69 @@ HTML_TEMPLATE = """
       });
     }
 
+    // Interaksi klik & seret langsung pada Grafik Kurva Profil Elevasi vs Azimut
+    function updateAzimuthFromPlotClientX(clientX) {
+      const img = document.getElementById('resPlotImg');
+      if (!img) return;
+      const rect = img.getBoundingClientRect();
+      if (rect.width <= 0) return;
+
+      const relX = (clientX - rect.left) / rect.width;
+
+      // Sumbu plot Matplotlib: left = 0.13, right = 0.96 (lebar area koordinat = 0.83)
+      const leftBound = 0.13;
+      const rightBound = 0.96;
+      const plotWidth = rightBound - leftBound;
+
+      const clampedX = Math.max(leftBound, Math.min(rightBound, relX));
+      const axisFraction = (clampedX - leftBound) / plotWidth;
+
+      const slider = document.getElementById('sliderAz');
+      if (!slider) return;
+      const minAz = parseFloat(slider.min) || 240.0;
+      const maxAz = parseFloat(slider.max) || 300.0;
+
+      const newAz = minAz + axisFraction * (maxAz - minAz);
+      slider.value = newAz.toFixed(2);
+      onSliderTargetChanged(newAz);
+    }
+
+    function initInteractivePlot() {
+      const wrapper = document.getElementById('plotInteractiveWrapper');
+      const img = document.getElementById('resPlotImg');
+      const targetEl = wrapper || img;
+      if (!targetEl) return;
+
+      let isPlotMouseDown = false;
+
+      targetEl.addEventListener('mousedown', function(e) {
+        if (e.button !== 0) return;
+        isPlotMouseDown = true;
+        updateAzimuthFromPlotClientX(e.clientX);
+      });
+
+      window.addEventListener('mousemove', function(e) {
+        if (!isPlotMouseDown) return;
+        updateAzimuthFromPlotClientX(e.clientX);
+      });
+
+      window.addEventListener('mouseup', function() {
+        isPlotMouseDown = false;
+      });
+
+      targetEl.addEventListener('touchstart', function(e) {
+        if (e.touches.length === 1) {
+          updateAzimuthFromPlotClientX(e.touches[0].clientX);
+        }
+      }, { passive: true });
+
+      targetEl.addEventListener('touchmove', function(e) {
+        if (e.touches.length === 1) {
+          updateAzimuthFromPlotClientX(e.touches[0].clientX);
+        }
+      }, { passive: true });
+    }
+
     // Dukungan Drag & Drop pada area pemilihan foto
     const dropAreaEl = document.getElementById('dropArea');
     if (dropAreaEl) {
@@ -2966,6 +3030,7 @@ HTML_TEMPLATE = """
 
     document.addEventListener('DOMContentLoaded', function() {
       initInteractiveImage();
+      initInteractivePlot();
       updatePhotoSlotsUI();
     });
   </script>
@@ -3156,6 +3221,7 @@ def fast_render_plot_image(azimuths, elevations, dip_deg, target_az=None, target
     fig, ax = plt.subplots(figsize=(8.0, 3.4), dpi=120)
     fig.patch.set_facecolor("#0f172a")
     ax.set_facecolor("#020617")
+    fig.subplots_adjust(left=0.13, right=0.96, top=0.88, bottom=0.15)
 
     az_arr = np.asarray(azimuths)
     el_arr = np.asarray(elevations)
@@ -3219,7 +3285,6 @@ def fast_render_plot_image(azimuths, elevations, dip_deg, target_az=None, target
     ax.set_title("Kurva Profil Elevasi Ufuk Mar'i vs Azimut", fontsize=9.5, fontweight="bold", color="#38bdf8", pad=6)
     ax.grid(True, linestyle="--", alpha=0.4, color="#334155")
     ax.legend(loc="upper right", fontsize=7.5, framealpha=0.85)
-    plt.tight_layout()
 
     buf = io.BytesIO()
     fig.savefig(buf, format="png", facecolor=fig.get_facecolor(), dpi=120)
