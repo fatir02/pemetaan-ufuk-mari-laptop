@@ -780,9 +780,32 @@ HTML_TEMPLATE = """
             </div>
 
             <!-- Frame Viewport Kamera Mandiri (Overlay Canvas Terkunci di Dalam Frame Video) -->
-            <div id="liveSensorBanner" style="padding: 7px 12px; margin-bottom: 10px; border-radius: 8px; font-size: 0.78rem; display: flex; align-items: center; justify-content: space-between; background: #1e293b; border: 1px solid #334155; color: #94a3b8;">
+            <div id="liveSensorBanner" style="padding: 7px 12px; margin-bottom: 8px; border-radius: 8px; font-size: 0.78rem; display: flex; align-items: center; justify-content: space-between; background: #1e293b; border: 1px solid #334155; color: #94a3b8;">
               <span id="sensorBannerText">🧭 Memeriksa koneksi sensor hardware...</span>
               <span id="sensorBannerCalib" style="font-size: 0.72rem; color: #64748b;"></span>
+            </div>
+
+            <!-- Toolbar Kontrol Lensa & Video Kamera Live (Zoom In/Out, Kecerahan, Kontras) -->
+            <div style="background: rgba(15, 23, 42, 0.95); padding: 8px 12px; margin-bottom: 10px; border-radius: 8px; border: 1px solid #334155; display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; font-size: 0.75rem;">
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <span style="color: #38bdf8; font-weight: bold;">🔍 Zoom:</span>
+                <button type="button" onclick="stepLiveCamZoom(-0.2)" title="Perkecil Zoom" style="background: #1e293b; border: 1px solid #475569; color: #fff; border-radius: 5px; padding: 2px 8px; cursor: pointer; font-weight: bold; font-size: 0.8rem;">➖</button>
+                <input type="range" id="camZoomSlider" min="1.0" max="4.0" step="0.1" value="1.0" oninput="setLiveCamZoom(this.value)" style="width: 85px; accent-color: #38bdf8; cursor: pointer;">
+                <button type="button" onclick="stepLiveCamZoom(0.2)" title="Perbesar Zoom" style="background: #1e293b; border: 1px solid #475569; color: #fff; border-radius: 5px; padding: 2px 8px; cursor: pointer; font-weight: bold; font-size: 0.8rem;">➕</button>
+                <b id="lblLiveZoomVal" style="color: #38bdf8; font-family: monospace; min-width: 35px;">1.0x</b>
+              </div>
+
+              <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                <div style="display: flex; align-items: center; gap: 4px;">
+                  <span style="color: #e2e8f0;">☀️ Terang:</span>
+                  <input type="range" id="camBrightnessSlider" min="60" max="160" step="5" value="100" oninput="setLiveCamBrightness(this.value)" style="width: 70px; accent-color: #facc15; cursor: pointer;" title="Atur kecerahan video">
+                </div>
+                <div style="display: flex; align-items: center; gap: 4px;">
+                  <span style="color: #e2e8f0;">🌓 Kontras:</span>
+                  <input type="range" id="camContrastSlider" min="60" max="160" step="5" value="100" oninput="setLiveCamContrast(this.value)" style="width: 70px; accent-color: #38bdf8; cursor: pointer;" title="Atur kontras video">
+                </div>
+                <button type="button" onclick="resetLiveCamFilters()" style="background: #1e293b; border: 1px solid #475569; color: #94a3b8; border-radius: 5px; padding: 2px 8px; cursor: pointer; font-size: 0.72rem;" title="Kembalikan Zoom & Pengaturan Video ke Normal">↺ Normal</button>
+              </div>
             </div>
 
             <div class="cam-viewport-box">
@@ -1744,6 +1767,7 @@ HTML_TEMPLATE = """
 
         video.onloadedmetadata = () => {
           video.play().catch(e => console.warn(e));
+          applyLiveCamFilters();
           drawLiveHudLoop();
           updateCameraDeviceList();
           checkCameraHardwareStatus();
@@ -1782,6 +1806,73 @@ HTML_TEMPLATE = """
           document.exitFullscreen().catch(err => console.warn(err));
         }
       }
+    }
+
+    // Pengaturan Zoom, Kecerahan, dan Kontras Kamera Live
+    let camLiveZoom = 1.0;
+    let camLiveBrightness = 100;
+    let camLiveContrast = 100;
+
+    function applyLiveCamFilters() {
+      const video = document.getElementById('cameraVideo');
+      if (video) {
+        video.style.transform = `scale(${camLiveZoom})`;
+        video.style.transformOrigin = 'center center';
+        video.style.filter = `brightness(${camLiveBrightness}%) contrast(${camLiveContrast}%)`;
+      }
+    }
+
+    async function setLiveCamZoom(val) {
+      camLiveZoom = parseFloat(val);
+      const lbl = document.getElementById('lblLiveZoomVal');
+      if (lbl) lbl.innerText = camLiveZoom.toFixed(1) + 'x';
+      const slider = document.getElementById('camZoomSlider');
+      if (slider && Math.abs(parseFloat(slider.value) - camLiveZoom) > 0.05) slider.value = camLiveZoom.toFixed(1);
+      applyLiveCamFilters();
+
+      // Kirim PTZ Hardware Zoom ke driver UVC jika didukung perangkat
+      try {
+        if (cameraStream) {
+          const track = cameraStream.getVideoTracks()[0];
+          if (track && track.getCapabilities) {
+            const caps = track.getCapabilities();
+            if (caps.zoom) {
+              const clamped = Math.min(caps.zoom.max, Math.max(caps.zoom.min, camLiveZoom));
+              await track.applyConstraints({ advanced: [{ zoom: clamped }] });
+            }
+          }
+        }
+      } catch (e) {}
+    }
+
+    function stepLiveCamZoom(delta) {
+      let next = Math.max(1.0, Math.min(4.0, Math.round((camLiveZoom + delta) * 10) / 10));
+      setLiveCamZoom(next);
+    }
+
+    function setLiveCamBrightness(val) {
+      camLiveBrightness = parseInt(val);
+      applyLiveCamFilters();
+    }
+
+    function setLiveCamContrast(val) {
+      camLiveContrast = parseInt(val);
+      applyLiveCamFilters();
+    }
+
+    function resetLiveCamFilters() {
+      camLiveZoom = 1.0;
+      camLiveBrightness = 100;
+      camLiveContrast = 100;
+      const sZoom = document.getElementById('camZoomSlider');
+      if (sZoom) sZoom.value = "1.0";
+      const sB = document.getElementById('camBrightnessSlider');
+      if (sB) sB.value = "100";
+      const sC = document.getElementById('camContrastSlider');
+      if (sC) sC.value = "100";
+      const lbl = document.getElementById('lblLiveZoomVal');
+      if (lbl) lbl.innerText = "1.0x";
+      applyLiveCamFilters();
     }
 
     function drawLiveHudLoop(timestamp) {
@@ -2129,7 +2220,25 @@ HTML_TEMPLATE = """
       hiddenCanvas.width = video.videoWidth;
       hiddenCanvas.height = video.videoHeight;
       const ctx = hiddenCanvas.getContext('2d');
-      ctx.drawImage(video, 0, 0, hiddenCanvas.width, hiddenCanvas.height);
+
+      // Terapkan penyesuaian kecerahan dan kontras
+      if (typeof ctx.filter !== 'undefined') {
+        ctx.filter = `brightness(${camLiveBrightness}%) contrast(${camLiveContrast}%)`;
+      }
+
+      // Jika pengguna melakukan zoom in, crop bagian tengah secara digital beresolusi penuh
+      if (camLiveZoom > 1.01) {
+        const cropW = video.videoWidth / camLiveZoom;
+        const cropH = video.videoHeight / camLiveZoom;
+        const cropX = (video.videoWidth - cropW) / 2;
+        const cropY = (video.videoHeight - cropH) / 2;
+        ctx.drawImage(video, cropX, cropY, cropW, cropH, 0, 0, hiddenCanvas.width, hiddenCanvas.height);
+      } else {
+        ctx.drawImage(video, 0, 0, hiddenCanvas.width, hiddenCanvas.height);
+      }
+      if (typeof ctx.filter !== 'undefined') {
+        ctx.filter = 'none';
+      }
 
       const b64 = hiddenCanvas.toDataURL('image/jpeg', 0.95);
       const slotNum = activeSlotIndex + 1;
