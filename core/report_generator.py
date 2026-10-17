@@ -519,12 +519,12 @@ def export_csv_data(
         f.write(f"Kerendahan Ufuk Laut Dip,\"-{dip_val:.4f}°\"\n")
         f.write(f"Waktu Ekspor,\"{time.strftime('%Y-%m-%d %H:%M:%S')} WIB\"\n")
         f.write("\n")
-        f.write("No,Azimut (°),Elevasi / cm,Data Lokasi,Status Kelayakan\n")
+        f.write("No,Azimut (°),Elevasi / cm,Data Lokasi\n")
         for r in table_rows:
             cm_str = get_elev_cm_str(r['el'])
             el_cm = f"{r['el']:+.2f}° / {cm_str} cm"
             f.write(
-                f"{r['no']},{r['az']:.2f},\"{el_cm}\",\"{safe_loc}\",\"{r['status']}\"\n"
+                f"{r['no']},{r['az']:.2f},\"{el_cm}\",\"{safe_loc}\"\n"
             )
 
     return output_csv_path
@@ -583,8 +583,8 @@ def export_excel_data(
     align_right = Alignment(horizontal="right", vertical="center")
     align_left = Alignment(horizontal="left", vertical="center")
 
-    # Title Banner (Row 1) - Merged 5 Columns (A1:E1)
-    ws.merge_cells("A1:E1")
+    # Title Banner (Row 1) - Merged 4 Columns (A1:D1)
+    ws.merge_cells("A1:D1")
     cell_a1 = ws["A1"]
     cell_a1.value = "TABEL DATA NUMERIK PROFIL UFUK MAR'I BERBASIS COMPUTER VISION"
     cell_a1.font = font_title
@@ -592,7 +592,7 @@ def export_excel_data(
     cell_a1.alignment = align_center
     ws.row_dimensions[1].height = 28
 
-    # Metadata (Rows 2 - 5) - Merged to Column E
+    # Metadata (Rows 2 - 5) - Merged to Column D
     metadata = [
         ("Data Lokasi / Pos Observasi", location_name),
         ("Azimut Bidikan Utama", f"{az_center:.2f}° (Barat)"),
@@ -606,23 +606,22 @@ def export_excel_data(
         c_lbl.fill = fill_meta
         c_lbl.border = thin_border
 
-        ws.merge_cells(start_row=row_idx, start_column=2, end_row=row_idx, end_column=5)
+        ws.merge_cells(start_row=row_idx, start_column=2, end_row=row_idx, end_column=4)
         c_val = ws.cell(row=row_idx, column=2, value=val)
         c_val.font = font_meta_val
         c_val.alignment = align_left
-        for col_i in range(2, 6):
+        for col_i in range(2, 5):
             ws.cell(row=row_idx, column=col_i).border = thin_border
 
     # Row 6 blank
     ws.row_dimensions[6].height = 10
 
-    # Table Headers (Row 7) - 5 Kolom Sesuai Preview
+    # Table Headers (Row 7) - 4 Kolom (No, Azimut, Elevasi, Data Lokasi)
     headers = [
         "No",
         "Azimut (°)",
         "Elevasi / cm",
         "Data Lokasi",
-        "Status Kelayakan",
     ]
     header_row = 7
     ws.row_dimensions[header_row].height = 26
@@ -632,26 +631,6 @@ def export_excel_data(
         cell.fill = fill_header
         cell.alignment = align_center
         cell.border = thin_border
-
-    # Status styles
-    status_styles = {
-        "Sangat Terbuka (Bebas)": (
-            PatternFill(start_color="DCFCE7", end_color="DCFCE7", fill_type="solid"),
-            Font(name="Segoe UI", size=10, bold=True, color="166534"),
-        ),
-        "Ufuk Rendah Terbuka": (
-            PatternFill(start_color="E0F2FE", end_color="E0F2FE", fill_type="solid"),
-            Font(name="Segoe UI", size=10, bold=True, color="0369A1"),
-        ),
-        "Halangan Rendah (Aman)": (
-            PatternFill(start_color="E0F2FE", end_color="E0F2FE", fill_type="solid"),
-            Font(name="Segoe UI", size=10, bold=True, color="0284C7"),
-        ),
-        "Halangan Tinggi (Waspada)": (
-            PatternFill(start_color="FEF3C7", end_color="FEF3C7", fill_type="solid"),
-            Font(name="Segoe UI", size=10, bold=True, color="92400E"),
-        ),
-    }
 
     current_row = header_row + 1
     for r in table_rows:
@@ -676,29 +655,18 @@ def export_excel_data(
         c_loc = ws.cell(row=current_row, column=4, value=location_name)
         c_loc.alignment = align_center
 
-        # Status Kelayakan
-        st = r["status"]
-        c_st = ws.cell(row=current_row, column=5, value=st)
-        c_st.alignment = align_center
-        if st in status_styles:
-            c_st.fill, c_st.font = status_styles[st]
-        else:
-            c_st.font = font_data
-            c_st.fill = row_fill
-
         for col_idx in range(1, 5):
             cell = ws.cell(row=current_row, column=col_idx)
             cell.font = font_data
             cell.fill = row_fill
             cell.border = thin_border
-        c_st.border = thin_border
 
         current_row += 1
 
     last_data_row = current_row - 1
 
-    # Auto Filter (A7:E)
-    ws.auto_filter.ref = f"A{header_row}:E{last_data_row}"
+    # Auto Filter (A7:D)
+    ws.auto_filter.ref = f"A{header_row}:D{last_data_row}"
 
     # Auto column width
     for col in ws.columns:

@@ -988,8 +988,8 @@ HTML_TEMPLATE = """
             </div>
           </div>
 
-          <!-- KURVA PROFIL ELEVASI VS AZIMUTH -->
-          <div class="card visual-card">
+          <!-- KURVA PROFIL ELEVASI VS AZIMUTH (DENGAN SLIDER ATUR SASARAN LANGSUNG DI DALAM FRAME) -->
+          <div class="card visual-card" style="margin-bottom: 14px;">
             <div class="card-title">
               <span>📈 4. Kurva Profil Elevasi vs Azimuth</span>
               <span style="font-size: 0.78rem; color: #38bdf8; font-weight: normal;">🎯 Klik garis merah / grafik untuk atur sasaran</span>
@@ -997,19 +997,11 @@ HTML_TEMPLATE = """
             <div class="img-wrapper" id="plotInteractiveWrapper" style="position: relative; background: #020617; border-radius: 8px; overflow: hidden; border: 1px solid #334155; text-align: center; cursor: crosshair;" title="Klik atau seret pada garis merah grafik untuk membidik azimut sasaran">
               <img id="resPlotImg" style="width: 100%; max-height: 400px; object-fit: contain; display: block; user-select: none;" alt="Grafik Profil Elevasi vs Azimuth" draggable="false">
             </div>
-          </div>
 
-          <!-- KARTU INSPEKSI AZIMUT & STATISTIK FALAK -->
-          <div class="card" style="margin-bottom: 14px;">
-            <div class="card-title">
-              <span>🎯 Inspeksi Azimut Sasaran Hilal</span>
-              <span style="font-size: 0.8rem; color: #94a3b8;">Scrubbing instan 0 ms</span>
-            </div>
-
-            <div class="slider-container">
+            <div class="slider-container" style="margin-top: 12px; padding: 10px 14px; background: #0f172a; border: 1px solid #1e293b; border-radius: 8px;">
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                <label style="margin: 0; font-size: 0.82rem;">Titik Azimut Sasaran:</label>
-                <b id="lblSliderAz" style="color: #38bdf8; font-size: 1.05rem; background: #0f172a; padding: 2px 10px; border-radius: 6px; border: 1px solid #334155;">270.00°</b>
+                <label style="margin: 0; font-size: 0.82rem; color: #cbd5e1; font-weight: 600;">Titik Azimut Sasaran:</label>
+                <b id="lblSliderAz" style="color: #38bdf8; font-size: 1.05rem; background: #020617; padding: 2px 10px; border-radius: 6px; border: 1px solid #334155;">270.00°</b>
               </div>
               <input type="range" id="sliderAz" min="240.0" max="300.0" step="0.05" value="270.0" oninput="onSliderTargetChanged(this.value)">
               <div style="display: flex; justify-content: space-between; font-size: 0.72rem; color: #64748b; margin-top: 4px;">
@@ -1017,18 +1009,6 @@ HTML_TEMPLATE = """
                 <span>Tengah (Barat)</span>
                 <span id="lblMaxAz">300.0°</span>
               </div>
-            </div>
-
-            <div class="stats-grid" style="grid-template-columns: 1fr;">
-              <div class="stat-card" style="border: 1px solid #10b981; background: #0f231d; padding: 12px 16px;">
-                <div class="stat-lbl" style="font-size: 0.85rem; color: #a7f3d0; margin-bottom: 4px;">Status Rukyatul Hilal</div>
-                <div class="stat-val" id="resStatusTxt" style="font-size: 1.15rem; color: #34d399; font-weight: bold;">Cukup Layak</div>
-                <div class="stat-sub" id="resCategoryTxt" style="color: #6ee7b7; font-size: 0.82rem; margin-top: 2px;">Ufuk Terbuka</div>
-              </div>
-            </div>
-
-            <div style="background-color: #0f172a; padding: 12px 14px; border-radius: 8px; margin-top: 12px; font-size: 0.82rem; line-height: 1.5; color: #cbd5e1; border-left: 3px solid #38bdf8;">
-              <p id="resDescText">Memuat deskripsi kelayakan...</p>
             </div>
           </div>
 
@@ -1127,8 +1107,7 @@ HTML_TEMPLATE = """
               <th style="padding: 10px 12px; font-weight: bold; border-right: 1px solid #1e293b; width: 60px; text-align: center;">No</th>
               <th style="padding: 10px 12px; font-weight: bold; border-right: 1px solid #1e293b; text-align: center;">Azimut (°)</th>
               <th style="padding: 10px 12px; font-weight: bold; border-right: 1px solid #1e293b; text-align: center;">Elevasi / cm</th>
-              <th style="padding: 10px 12px; font-weight: bold; border-right: 1px solid #1e293b; text-align: center;">Data Lokasi</th>
-              <th style="padding: 10px 12px; font-weight: bold; text-align: center;">Status Kelayakan</th>
+              <th style="padding: 10px 12px; font-weight: bold; text-align: center;">Data Lokasi</th>
             </tr>
           </thead>
           <tbody id="numericTableBody">
@@ -2464,15 +2443,21 @@ HTML_TEMPLATE = """
         const delta = analysis.target_alt - 0.0;
         document.getElementById('resDeltaHakiki').innerText = (delta >= 0 ? "+" : "") + delta.toFixed(2) + "°";
       }
-      document.getElementById('resStatusTxt').innerText = analysis.severity || analysis.status || "Layak";
+      if (document.getElementById('resStatusTxt')) {
+        document.getElementById('resStatusTxt').innerText = analysis.severity || analysis.status || "Layak";
+      }
       const cat = analysis.category || analysis.status || "Ufuk Terbuka";
       if (document.getElementById('resCategoryTxt')) {
         document.getElementById('resCategoryTxt').innerText = cat;
       }
       
       const smartDesc = `Berdasarkan ekstraksi kontur computer vision pada azimut bidikan ${targetAz.toFixed(2)}°, diperoleh tinggi rintangan ufuk pada azimut sasaran ${targetAz.toFixed(2)}° sebesar ${altStr}. Kondisi ufuk: ${cat}.`;
-      document.getElementById('resDescText').innerText = smartDesc;
-      document.getElementById('textDesc').value = smartDesc;
+      if (document.getElementById('resDescText')) {
+        document.getElementById('resDescText').innerText = smartDesc;
+      }
+      if (document.getElementById('textDesc')) {
+        document.getElementById('textDesc').value = smartDesc;
+      }
 
       let smartRec = "";
       if (analysis.target_alt <= 0.0) {
@@ -2704,8 +2689,7 @@ HTML_TEMPLATE = """
           <td style="padding: 8px 12px; color: #64748b; font-family: monospace; border-right: 1px solid #1e293b; text-align: center;">${idx + 1}</td>
           <td style="padding: 8px 12px; font-weight: bold; color: #38bdf8; font-family: monospace; border-right: 1px solid #1e293b; text-align: center;">${az.toFixed(2)}°</td>
           <td style="padding: 8px 12px; font-weight: bold; color: #f8fafc; font-family: monospace; border-right: 1px solid #1e293b; text-align: center;">${elevDisplay}</td>
-          <td style="padding: 8px 12px; color: #cbd5e1; font-family: monospace; border-right: 1px solid #1e293b; text-align: center;">${locStr}</td>
-          <td style="padding: 8px 12px; text-align: center;">${badgeHtml}</td>
+          <td style="padding: 8px 12px; color: #cbd5e1; font-family: monospace; text-align: center;">${locStr}</td>
         </tr>`;
       });
       tbody.innerHTML = html;
@@ -2718,7 +2702,7 @@ HTML_TEMPLATE = """
         alert("Tidak ada data untuk disalin.");
         return;
       }
-      const headerRow = ["No", "Azimut (°)", "Elevasi / cm", "Data Lokasi", "Status Kelayakan"].join("\\t");
+      const headerRow = ["No", "Azimut (°)", "Elevasi / cm", "Data Lokasi"].join("\\t");
       let tsv = headerRow + "\\n";
       rows.forEach(r => {
         const cells = Array.from(r.querySelectorAll('td')).map(c => c.innerText.trim());
