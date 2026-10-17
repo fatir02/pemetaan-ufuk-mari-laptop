@@ -1917,8 +1917,8 @@ HTML_TEMPLATE = """
           const vFovDeg = 47.0; // Kalibrasi rentang pandang vertikal (interval 20° pas dengan kaca atas & bawah)
           const pxPerDegV = vBarH / vFovDeg;
 
-          // Titik acuan level 0° dan crosshair tengah dinaikkan 1 derajat (+1° / pxPerDegV) sesuai garis hitam fisik (gambar 15)
-          const cy = (h / 2.0) + (h * 0.0516) - (1.0 * pxPerDegV);
+          // Titik acuan level 0° dan crosshair tengah disesuaikan presisi (+0.9° / pxPerDegV, diturunkan 0.1° dari sebelumnya) agar pas di tengah garis hitam
+          const cy = (h / 2.0) + (h * 0.0516) - (0.9 * pxPerDegV);
 
           const curAz = liveCompassConnected ? liveCompassAzimuth : (parseFloat(document.getElementById('inpAzimuth').value) || 270.0);
           const curTilt = liveCompassConnected ? liveCompassTilt : (parseFloat(document.getElementById('inpTilt').value) || 0.0);
