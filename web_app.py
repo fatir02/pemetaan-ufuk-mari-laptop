@@ -2160,55 +2160,6 @@ HTML_TEMPLATE = """
           ctx.fillStyle = isLevel ? "#34d399" : "#38bdf8";
           ctx.fill();
           ctx.shadowBlur = 0;
-
-          // F. Status Sensor Hardware Badge di Pojok Kiri Atas Kamera
-          ctx.save();
-          ctx.font = `bold ${Math.round(10 * scale)}px sans-serif`;
-          let hudStatusText = "";
-          let hudStatusBg = "rgba(15, 23, 42, 0.75)";
-          let hudBorder = "#334155";
-          let hudColor = "#94a3b8";
-
-          if (liveCompassConnected) {
-            hudStatusText = `🟢 ${liveCompassPort} LIVE | Mag: ${liveCompassMag}/3 | Gyro: ${liveCompassGyro}/3`;
-            hudStatusBg = "rgba(6, 78, 59, 0.85)";
-            hudBorder = "#10b981";
-            hudColor = "#6ee7b7";
-          } else if (liveCompassStatus.includes("sibuk") || liveCompassStatus.includes("terkunci")) {
-            hudStatusText = `⚠️ TUTUP SERIAL MONITOR ARDUINO (${liveCompassPort || "COM5"} TERKUNCI)`;
-            hudStatusBg = "rgba(153, 27, 27, 0.9)";
-            hudBorder = "#ef4444";
-            hudColor = "#fecaca";
-          } else {
-            hudStatusText = `⚠️ SENSOR OFF: ${liveCompassStatus || "Tidak terdeteksi"}`;
-            hudStatusBg = "rgba(30, 41, 59, 0.8)";
-            hudBorder = "#475569";
-            hudColor = "#cbd5e1";
-          }
-
-          const txtMetrics = ctx.measureText(hudStatusText);
-          const padX = 8 * scale;
-          const boxW = txtMetrics.width + (padX * 2);
-          const boxH = 20 * scale;
-          const boxX = 12 * scale;
-          const boxY = 12 * scale;
-
-          ctx.fillStyle = hudStatusBg;
-          ctx.strokeStyle = hudBorder;
-          ctx.lineWidth = 1 * scale;
-          ctx.beginPath();
-          if (ctx.roundRect) {
-            ctx.roundRect(boxX, boxY, boxW, boxH, 4 * scale);
-          } else {
-            ctx.rect(boxX, boxY, boxW, boxH);
-          }
-          ctx.fill();
-          ctx.stroke();
-
-          ctx.fillStyle = hudColor;
-          ctx.textAlign = "left";
-          ctx.fillText(hudStatusText, boxX + padX, boxY + (14 * scale));
-          ctx.restore();
         }
       }
 
