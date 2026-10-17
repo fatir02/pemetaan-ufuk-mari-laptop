@@ -2043,8 +2043,8 @@ HTML_TEMPLATE = """
           ctx.stroke();
 
           // Skala derajat bergerak live mengikuti sudut curTilt
-          // Rentang pandang vertikal: 40 derajat
-          const vFovDeg = 40;
+          // Rentang pandang vertikal dikalibrasi presisi: 47.0 derajat (interval 20° pas dengan kaca atas & bawah)
+          const vFovDeg = 47.0;
           const pxPerDegV = vBarH / vFovDeg;
           const startPitch = Math.floor(curTilt - (vFovDeg / 2) - 2);
           const endPitch = Math.ceil(curTilt + (vFovDeg / 2) + 2);
