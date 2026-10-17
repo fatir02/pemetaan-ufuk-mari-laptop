@@ -1904,31 +1904,34 @@ HTML_TEMPLATE = """
           const isLevel = Math.abs(curTilt) <= 0.8;
 
           // ==========================================================
-          // 1. KOMPAS HORIZONTAL ARAH MATA ANGIN MEMENUHI KIRI DAN KANAN
+          // 1. KOMPAS HORIZONTAL ARAH MATA ANGIN (Rentang 240° s.d. 300°)
           // ==========================================================
-          const tapeW = w; // Memenuhi kiri dan kanan penuh layar
+          const visibleFov = 64; // Menampilkan rentang derajat dari 240° (kiri) hingga 300° (kanan) saat bidik 270°
+          const tapeW = Math.min(w * 0.72, 640 * scale); // Garis proporsional, rapi di tengah dan tidak penuh layar
           const tapeH = 34 * scale;
-          const tapeX = 0;
+          const tapeX = cx - (tapeW / 2); // Titik awal dihitung agar simetris di tengah
           const tapeY = 10 * scale;
 
           ctx.save();
-          // Baseline garis kompas horizontal penuh dari ujung kiri (0) ke kanan (w)
-          ctx.strokeStyle = "rgba(255, 255, 255, 0.25)";
+          // Baseline garis kompas horizontal sepanjang tapeW
+          ctx.strokeStyle = "rgba(255, 255, 255, 0.28)";
           ctx.lineWidth = 1 * scale;
           ctx.beginPath();
-          ctx.moveTo(0, tapeY + tapeH);
-          ctx.lineTo(w, tapeY + tapeH);
+          ctx.moveTo(tapeX, tapeY + tapeH);
+          ctx.lineTo(tapeX + tapeW, tapeY + tapeH);
           ctx.stroke();
 
-          // Garis skala derajat kompas horizontal bergerak live penuh layar
-          const visibleFov = 90; // Rentang pandang pita kompas penuh
-          const pxPerDeg = w / visibleFov;
+          // Skala derajat dihitung sesuai rentang FOV
+          const pxPerDeg = tapeW / visibleFov;
           const startDeg = Math.floor(curAz - (visibleFov / 2) - 2);
           const endDeg = Math.ceil(curAz + (visibleFov / 2) + 2);
 
           for (let d = startDeg; d <= endDeg; d++) {
             const xPos = cx + (d - curAz) * pxPerDeg;
-            if (xPos < 0 || xPos > w) continue;
+            // Batasi agar angka dan garis derajat tidak digambar di luar pita
+            if (xPos < tapeX || xPos > tapeX + tapeW) continue;
+
+
             const normDeg = ((d % 360) + 360) % 360;
 
             if (normDeg % 45 === 0) {
