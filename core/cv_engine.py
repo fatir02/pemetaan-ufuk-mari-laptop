@@ -189,9 +189,11 @@ class HorizonDetector:
             parent = np.zeros((roi_h, w), dtype=np.int32)
             dp[:, 0] = cost[:, 0]
 
-            max_jump = max(4, int(roi_h * 0.04))
+            # Batasi rentang loncatan antarkolom dan gandakan penalti kelengkungan
+            # agar garis tidak terjerumus menukik ke celah dinding/atap rumah di bawah
+            max_jump = min(16, max(4, int(roi_h * 0.025)))
             jump_idx = np.arange(-max_jump, max_jump + 1)
-            jump_penalty_kernel = (0.03 * (jump_idx ** 2)).astype(np.float32)
+            jump_penalty_kernel = (0.06 * (jump_idx ** 2)).astype(np.float32)
 
             y_grid = np.arange(roi_h, dtype=np.int32)
 
@@ -286,30 +288,29 @@ class HorizonDetector:
                 col_y = np.full(w, float(y_max), dtype=np.float64)
             raw_horizon_y = col_y
 
-        # Smoothing kontur untuk membuang artefak tajam/noise kabel tanpa mengubah lekuk bukit
+        # Gunakan kernel median kecil (maks size 5) agar puncak objek tidak terpotong
         sw = max(3, smooth_window | 1)
-        if sw >= 3 and len(raw_horizon_y) > sw:
-            # Menggunakan boundary mode 'nearest' agar tepi kiri dan kanan tidak loncat/anjlok
+        med_size = min(5, sw)
+        if len(raw_horizon_y) > med_size:
             from scipy.ndimage import median_filter, uniform_filter1d
-            filtered = median_filter(raw_horizon_y, size=sw, mode="nearest")
-            base_smoothed = uniform_filter1d(filtered, size=5, mode="nearest")
+            filtered = median_filter(raw_horizon_y, size=med_size, mode="nearest")
+            base_smoothed = uniform_filter1d(filtered, size=3, mode="nearest")
             horizon_y = np.clip(base_smoothed, float(y_min), float(y_max))
         else:
             horizon_y = raw_horizon_y
 
-        # Integrasi halangan vertikal ramping (menara BTS, menara SUTET, menara air, tiang antena)
-        # Menggunakan analisis statistik kontras horizontal zona langit OpenCV hitam-putih
-        # untuk membedakan struktur menara fisik dari variasi awan/langit alami.
-        # ponytail: width <= 35px & contrast >= 10.0; upgrade to Hough line detector for faint wire stays
+        # Integrasi halangan vertikal ramping (menara BTS, SUTET, kubah, tiang antena)
+        # Menggunakan Filter Slender Prominence dengan Triple Acceptance Gate
         try:
-            min_base = int(np.clip(np.min(horizon_y) - 10, y_min, y_max))
-            if min_base > y_min + 20:
-                sky_zone = gray[y_min:min_base, :]
-                p25 = float(np.percentile(sky_zone, 25))
-                sky_thresh = p25
+            min_base = int(np.clip(np.min(horizon_y) - 8, y_min, y_max))
+            if min_base > y_min + 15:
+                sky_zone = gray[y_min:min_base, x_start:x_end+1]
+                sky_med = float(np.median(sky_zone))
+                # Ambang dijangkarkan ke median langit (menolak variasi rumbai awan)
+                sky_thresh = sky_med - 20.0
 
                 obs_mask = (gray < sky_thresh).astype(np.uint8) * 255
-                kernel_vert = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 15))
+                kernel_vert = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 13))
                 obs_closed = cv2.morphologyEx(obs_mask, cv2.MORPH_CLOSE, kernel_vert)
 
                 tower_y = np.copy(horizon_y)
@@ -321,10 +322,10 @@ class HorizonDetector:
                     curr = b_idx
                     while curr > y_min and col[curr] > 0:
                         curr -= 1
-                    if curr < b_idx - 3:
+                    if curr < b_idx - 5:
                         tower_y[x] = float(curr)
 
-                is_obstacle = (tower_y < horizon_y - 8)
+                is_obstacle = (tower_y < horizon_y - 6)
                 jumps = np.where(is_obstacle)[0]
                 for _, g in groupby(enumerate(jumps), lambda ix: ix[0] - ix[1]):
                     group = list(map(itemgetter(1), g))
@@ -332,19 +333,18 @@ class HorizonDetector:
                     tip_y = np.min(tower_y[group])
                     base_y = np.median(horizon_y[group])
                     height = base_y - tip_y
+                    aspect = height / max(1.0, float(width))
 
-                    # Validasi kontras horizontal terhadap langit di samping kiri dan kanan struktur
-                    y_check = int(round(tip_y + min(5, height * 0.3)))
-                    x_l = max(0, group[0] - max(6, width))
-                    x_r = min(w - 1, group[-1] + max(6, width))
+                    y_check = int(round(tip_y + min(4, height * 0.3)))
+                    x_l = max(0, group[0] - max(8, width))
+                    x_r = min(w - 1, group[-1] + max(8, width))
                     sky_l = float(gray[y_check, x_l])
                     sky_r = float(gray[y_check, x_r])
-                    obj_val = float(np.min(gray[y_check, group[0]:group[-1]+1]))
-                    contrast = min(sky_l, sky_r) - obj_val
+                    tip_val = float(np.min(gray[y_check, group[0]:group[-1]+1]))
+                    contrast = min(sky_l, sky_r) - tip_val
 
-                    # Struktur fisik sejati: ramping (width <= 35) dan memiliki kontras gelap
-                    # terhadap latar langit di sampingnya (contrast >= 10.0), menolak awan datar
-                    if 2 <= width <= 35 and contrast >= 10.0:
+                    # Triple Gate: struktur fisik ramping dengan kontras nyata terhadap langit di kedua sisi
+                    if 2 <= width <= 32 and height >= 10 and aspect >= 1.25 and contrast >= 15.0:
                         horizon_y[group] = tower_y[group]
         except Exception:
             pass
@@ -562,7 +562,47 @@ class HorizonDetector:
         # Garis kontur kuning neon terang
         cv2.polylines(canvas, [pts], isClosed=False, color=(0, 255, 255), thickness=line_thick, lineType=cv2.LINE_AA)
 
-        # 4. Anotasi Popup Objek Menonjol (Prominent Obstacles / Peaks)
+        # 4. Kursor Azimut Sasaran - Resolusi Target Terlebih Dahulu
+        if target_x is None and target_az is not None:
+            if azimuths is not None and len(azimuths) == w:
+                target_x = int(np.argmin(np.abs(azimuths - target_az)))
+            else:
+                from core.falak_calc import azimuth_elevation_to_pixel
+                tx_calc, _ = azimuth_elevation_to_pixel(
+                    target_az, 0.0, w, h, az_center, hfov, vfov, tilt_center
+                )
+                target_x = int(round(tx_calc))
+
+        # 1. Hitung info target terlebih dahulu
+        placed_boxes = []
+        target_info = None
+        if target_x is not None and 0 <= target_x < w:
+            raw_ty = horizon_y[target_x] if target_y is None else target_y
+            ty = int(round(raw_ty))
+            if target_az is not None and elevations is not None:
+                alt_val = elevations[target_x]
+                txt = f"Az: {target_az:.2f} deg | Alt: {alt_val:+.2f} deg"
+                font = cv2.FONT_HERSHEY_SIMPLEX
+                font_scale = 0.42
+                (tw, th), baseline = cv2.getTextSize(txt, font, font_scale, 1)
+                tx_box = min(w - tw - 24, max(10, target_x - tw // 2))
+                ty_box = max(th + 16, ty - 26)
+                box_w = tw + 18
+                box_h = th + baseline + 10
+                box_top = ty_box - th - 5
+                placed_boxes.append((tx_box, box_top, box_w, box_h))
+                target_info = (tx_box, ty_box, box_top, box_w, box_h, txt)
+
+        # 2. Gambar garis meridian merah dan retikel bidik
+        if target_x is not None and 0 <= target_x < w:
+            raw_ty = horizon_y[target_x] if target_y is None else target_y
+            ty = int(round(raw_ty))
+            cv2.line(canvas, (target_x, 0), (target_x, h - 1), (0, 0, 255), 2, cv2.LINE_AA)
+            cv2.circle(canvas, (target_x, ty), 6, (0, 0, 255), -1, cv2.LINE_AA)
+            cv2.circle(canvas, (target_x, ty), 11, (255, 255, 255), 2, cv2.LINE_AA)
+            cv2.circle(canvas, (target_x, ty), 15, (0, 0, 255), 1, cv2.LINE_AA)
+
+        # 3. Anotasi Popup Objek Menonjol (Prominent Obstacles / Peaks)
         # Menampilkan penanda dan pop up angka derajat horizontal & vertikal pada objek yang menonjol
         if show_prominent_peaks and elevations is not None and azimuths is not None:
             if prominent_obstacles is None:
@@ -598,8 +638,17 @@ class HorizonDetector:
                 box_y = py - stem_len - box_h
                 if box_y < 12:
                     box_y = min(h - box_h - 10, py + 18)
-                box_x = int(px - box_w / 2)
-                box_x = max(8, min(w - box_w - 8, box_x))
+                cand_bx = int(px - box_w / 2)
+                cand_bx = max(8, min(w - box_w - 8, cand_bx))
+
+                # Margin keselamatan 6px terhadap garis meridian merah agar teks tidak tertimpa
+                if target_x is not None and abs(px - target_x) > 10:
+                    if cand_bx <= target_x <= cand_bx + box_w:
+                        if px < target_x:
+                            cand_bx = max(8, target_x - box_w - 6)
+                        else:
+                            cand_bx = min(w - box_w - 8, target_x + 6)
+                box_x = cand_bx
 
                 # Garis vertikal penunjuk dari pucuk objek ke kotak popup
                 stem_top = box_y + box_h if box_y < py else box_y
@@ -619,42 +668,14 @@ class HorizonDetector:
                     font, font_scale, (255, 255, 255), thick, cv2.LINE_AA
                 )
 
-        # 5. Kursor Azimut Sasaran (Target Azimuth Line & Marker)
-        # ponytail: argmin lookup over precomputed azimuths; upgrade to pinhole inversion if azimuth grid is non-uniform
-        if target_x is None and target_az is not None:
-            if azimuths is not None and len(azimuths) == w:
-                target_x = int(np.argmin(np.abs(azimuths - target_az)))
-            else:
-                from core.falak_calc import azimuth_elevation_to_pixel
-                tx_calc, _ = azimuth_elevation_to_pixel(
-                    target_az, 0.0, w, h, az_center, hfov, vfov, tilt_center
-                )
-                target_x = int(round(tx_calc))
-
-        if target_x is not None and 0 <= target_x < w:
-            raw_ty = horizon_y[target_x] if target_y is None else target_y
-            ty = int(round(raw_ty))
-            cv2.line(canvas, (target_x, 0), (target_x, h - 1), (0, 0, 255), 2, cv2.LINE_AA)
-            cv2.circle(canvas, (target_x, ty), 6, (0, 0, 255), -1, cv2.LINE_AA)
-            cv2.circle(canvas, (target_x, ty), 11, (255, 255, 255), 2, cv2.LINE_AA)
-            cv2.circle(canvas, (target_x, ty), 15, (0, 0, 255), 1, cv2.LINE_AA)
-
-            if target_az is not None and elevations is not None:
-                alt_val = elevations[target_x]
-                txt = f"Az: {target_az:.2f} deg | Alt: {alt_val:+.2f} deg"
-                font = cv2.FONT_HERSHEY_SIMPLEX
-                font_scale = 0.42
-                (tw, th), baseline = cv2.getTextSize(txt, font, font_scale, 1)
-                tx_box = min(w - tw - 24, max(10, target_x - tw // 2))
-                ty_box = max(th + 16, ty - 26)
-                box_w = tw + 18
-                box_h = th + baseline + 10
-                box_top = ty_box - th - 5
-                cv2.rectangle(canvas, (tx_box, box_top), (tx_box + box_w, box_top + box_h), (20, 20, 25), -1)
-                cv2.rectangle(canvas, (tx_box, box_top), (tx_box + box_w, box_top + box_h), (0, 50, 255), 1, cv2.LINE_AA)
-                cv2.putText(
-                    canvas, txt, (tx_box + 8, ty_box),
-                    font, font_scale, (255, 255, 255), 1, cv2.LINE_AA
-                )
+        # 4. Gambar kotak teks kursor target di layer paling atas
+        if target_x is not None and 0 <= target_x < w and target_info is not None:
+            tx_box, ty_box, box_top, box_w, box_h, txt = target_info
+            cv2.rectangle(canvas, (tx_box, box_top), (tx_box + box_w, box_top + box_h), (20, 20, 25), -1)
+            cv2.rectangle(canvas, (tx_box, box_top), (tx_box + box_w, box_top + box_h), (0, 50, 255), 1, cv2.LINE_AA)
+            cv2.putText(
+                canvas, txt, (tx_box + 8, ty_box),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.42, (255, 255, 255), 1, cv2.LINE_AA
+            )
 
         return canvas
