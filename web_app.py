@@ -893,20 +893,7 @@ HTML_TEMPLATE = """
             <span id="compassStatusText" style="color: #94a3b8;">🧭 Kompas Hardware: Memeriksa COM7...</span>
           </div>
 
-          <div class="grid-2" style="margin-bottom: 12px;">
-            <div class="form-group">
-              <label>Rentang Azimut / HFOV (°):</label>
-              <input type="number" id="inpHfov" value="20.0" step="1.0" min="5.0" max="60.0">
-              <span style="font-size: 0.68rem; color: #38bdf8;">Selisih 20° (Rentang 260° s.d. 280°)</span>
-            </div>
-            <div class="form-group">
-              <label>Tinggi Alat (mdpl):</label>
-              <input type="number" id="inpAlt" value="45.0" step="1" placeholder="45">
-              <span style="font-size: 0.68rem; color: #64748b;">Meter dpl (Ketinggian pengamat)</span>
-            </div>
-          </div>
-
-          <div class="grid-2">
+          <div class="grid-3">
             <div class="form-group">
               <label>Lintang / Lat (°):</label>
               <input type="number" id="inpLat" value="-7.9800" step="0.0001" placeholder="-7.9800">
@@ -917,7 +904,13 @@ HTML_TEMPLATE = """
               <input type="number" id="inpLon" value="110.3061" step="0.0001" placeholder="110.3061">
               <span style="font-size: 0.68rem; color: #64748b;">BT: plus (+), BB: minus (-)</span>
             </div>
+            <div class="form-group">
+              <label>Tinggi (mdpl):</label>
+              <input type="number" id="inpAlt" value="45.0" step="1" placeholder="45">
+              <span style="font-size: 0.68rem; color: #64748b;">Meter dpl (Ketinggian alat)</span>
+            </div>
           </div>
+          <input type="hidden" id="inpHfov" value="60.0">
 
           <button type="button" id="btnProcess" class="btn btn-primary" onclick="processImage()" style="margin-top: 6px;">
             🚀 PROSES EKSTRAKSI KONTUR UFUK
@@ -999,7 +992,6 @@ HTML_TEMPLATE = """
           <div class="card visual-card">
             <div class="card-title">
               <span>📈 4. Kurva Profil Elevasi vs Azimuth</span>
-              <span class="badge badge-accent">Fast OpenCV Vector</span>
             </div>
             <div class="img-wrapper" style="position: relative; background: #020617; border-radius: 8px; overflow: hidden; border: 1px solid #334155; text-align: center;">
               <img id="resPlotImg" style="width: 100%; max-height: 400px; object-fit: contain; display: block;" alt="Grafik Profil Elevasi vs Azimuth">
@@ -1018,34 +1010,19 @@ HTML_TEMPLATE = """
                 <label style="margin: 0; font-size: 0.82rem;">Titik Azimut Sasaran:</label>
                 <b id="lblSliderAz" style="color: #38bdf8; font-size: 1.05rem; background: #0f172a; padding: 2px 10px; border-radius: 6px; border: 1px solid #334155;">270.00°</b>
               </div>
-              <input type="range" id="sliderAz" min="262.5" max="277.5" step="0.05" value="270.0" oninput="onSliderTargetChanged(this.value)">
+              <input type="range" id="sliderAz" min="240.0" max="300.0" step="0.05" value="270.0" oninput="onSliderTargetChanged(this.value)">
               <div style="display: flex; justify-content: space-between; font-size: 0.72rem; color: #64748b; margin-top: 4px;">
-                <span id="lblMinAz">262.5°</span>
+                <span id="lblMinAz">240.0°</span>
                 <span>Tengah (Barat)</span>
-                <span id="lblMaxAz">277.5°</span>
+                <span id="lblMaxAz">300.0°</span>
               </div>
             </div>
 
-            <div class="stats-grid">
-              <div class="stat-card">
-                <div class="stat-lbl">Tinggi Halangan Mar'i</div>
-                <div class="stat-val" id="resTargetAlt">+0.14°</div>
-                <div class="stat-sub" id="resTargetAltDms">00° 08' 24"</div>
-              </div>
-              <div class="stat-card">
-                <div class="stat-lbl">Ufuk Laut (Dip)</div>
-                <div class="stat-val" id="resDip">-0.20°</div>
-                <div class="stat-sub" id="resDipDms">-00° 11' 50"</div>
-              </div>
-              <div class="stat-card">
-                <div class="stat-lbl">Selisih Hakiki (Δ0°)</div>
-                <div class="stat-val" id="resDeltaHakiki">+0.14°</div>
-                <div class="stat-sub">Relatif Ufuk 0.00°</div>
-              </div>
-              <div class="stat-card">
-                <div class="stat-lbl">Status Rukyatul Hilal</div>
-                <div class="stat-val" id="resStatusTxt" style="font-size: 0.92rem; color: #34d399;">Cukup Layak</div>
-                <div class="stat-sub" id="resCategoryTxt">Ufuk Terbuka</div>
+            <div class="stats-grid" style="grid-template-columns: 1fr;">
+              <div class="stat-card" style="border: 1px solid #10b981; background: #0f231d; padding: 12px 16px;">
+                <div class="stat-lbl" style="font-size: 0.85rem; color: #a7f3d0; margin-bottom: 4px;">Status Rukyatul Hilal</div>
+                <div class="stat-val" id="resStatusTxt" style="font-size: 1.15rem; color: #34d399; font-weight: bold;">Cukup Layak</div>
+                <div class="stat-sub" id="resCategoryTxt" style="color: #6ee7b7; font-size: 0.82rem; margin-top: 2px;">Ufuk Terbuka</div>
               </div>
             </div>
 
@@ -2344,10 +2321,10 @@ HTML_TEMPLATE = """
         image_base64: selectedImageBase64,
         azimuth: parseFloat(document.getElementById('inpAzimuth').value) || 270.0,
         tilt: parseFloat(document.getElementById('inpTilt').value) || 0.0,
-        hfov: parseFloat(document.getElementById('inpHfov')?.value) || 20.0,
+        hfov: parseFloat(document.getElementById('inpHfov')?.value) || 60.0,
         latitude: parseFloat(document.getElementById('inpLat').value) || -7.98,
         longitude: parseFloat(document.getElementById('inpLon').value) || 110.306,
-        altitude: parseFloat(document.getElementById('inpAlt').value) || 45.0
+        altitude: parseFloat(document.getElementById('inpAlt')?.value) || 45.0
       };
 
       fetch('/api/analyze', {
@@ -2469,12 +2446,16 @@ HTML_TEMPLATE = """
 
     function updateTargetDisplay(targetAz, analysis) {
       const altStr = (analysis.target_alt >= 0 ? "+" : "") + analysis.target_alt.toFixed(2) + "°";
-      document.getElementById('resTargetAlt').innerText = altStr;
+      if (document.getElementById('resTargetAlt')) {
+        document.getElementById('resTargetAlt').innerText = altStr;
+      }
       if (document.getElementById('resTargetAltDms')) {
         document.getElementById('resTargetAltDms').innerText = formatDms(analysis.target_alt);
       }
       const dipVal = analysis.dip_deg || 0.20;
-      document.getElementById('resDip').innerText = "-" + dipVal.toFixed(2) + "°";
+      if (document.getElementById('resDip')) {
+        document.getElementById('resDip').innerText = "-" + dipVal.toFixed(2) + "°";
+      }
       if (document.getElementById('resDipDms')) {
         document.getElementById('resDipDms').innerText = formatDms(-dipVal);
       }
@@ -3170,26 +3151,42 @@ def fast_render_plot_image(azimuths, elevations, dip_deg, target_az=None, target
     
     az_min = float(azimuths[0])
     az_max = float(azimuths[-1])
-    min_y = min(-dip_deg - 0.5, float(np.min(elevations)) - 0.5, -1.0)
-    max_y = max(float(np.max(elevations)) + 0.8, 2.0)
+    min_y = 0.0
+    max_y = 40.0
+    if float(np.min(elevations)) < -0.5:
+        min_y = -10.0
     
     def to_screen(az, el):
         x = lm + int((az - az_min) / (az_max - az_min + 1e-6) * pw)
         y = tm + int((max_y - el) / (max_y - min_y + 1e-6) * ph)
         return x, y
 
-    y_step = 1.0 if (max_y - min_y) < 6 else 2.0
-    for el_val in np.arange(np.ceil(min_y), max_y, y_step):
+    # Grid Elevasi vertikal sampai 40 derajat (interval 5 derajat)
+    for el_val in np.arange(min_y, max_y + 0.1, 5.0):
         _, sy = to_screen(az_min, el_val)
         if tm <= sy <= tm + ph:
-            cv2.line(img, (lm, sy), (lm + pw, sy), (55, 40, 30), 1)
-            cv2.putText(img, f'{el_val:+.1f}*', (10, sy + 4), cv2.FONT_HERSHEY_SIMPLEX, 0.34, (184, 163, 148), 1, cv2.LINE_AA)
+            is_major = (el_val % 10 == 0)
+            cv2.line(img, (lm, sy), (lm + pw, sy), (65, 48, 38) if is_major else (45, 32, 24), 1)
+            sign = '+' if el_val > 0 else ''
+            cv2.putText(img, f'{sign}{el_val:.0f}*', (12, sy + 4), cv2.FONT_HERSHEY_SIMPLEX, 0.34, (200, 180, 160) if is_major else (140, 120, 105), 1, cv2.LINE_AA)
 
-    for frac in [0.0, 0.25, 0.5, 0.75, 1.0]:
-        az_val = az_min + frac * (az_max - az_min)
+    # Grid Azimut horizontal (selisih 60 derajat, e.g. 240 s.d 300)
+    if abs((az_max - az_min) - 60.0) < 5.0 and abs(az_min - 240.0) < 5.0:
+        az_ticks = [240.0, 250.0, 260.0, 270.0, 280.0, 290.0, 300.0]
+    else:
+        az_step = 10.0 if (az_max - az_min) >= 30.0 else 5.0
+        az_ticks = list(np.arange(np.ceil(az_min / az_step) * az_step, az_max + 0.1, az_step))
+        if not any(abs(t - az_min) < 1.0 for t in az_ticks):
+            az_ticks.insert(0, az_min)
+        if not any(abs(t - az_max) < 1.0 for t in az_ticks):
+            az_ticks.append(az_max)
+
+    for az_val in az_ticks:
         sx, _ = to_screen(az_val, min_y)
-        cv2.line(img, (sx, tm), (sx, tm + ph), (55, 40, 30), 1)
-        cv2.putText(img, f'{az_val:.1f}*', (sx - 18, tm + ph + 18), cv2.FONT_HERSHEY_SIMPLEX, 0.33, (184, 163, 148), 1, cv2.LINE_AA)
+        if lm <= sx <= lm + pw:
+            is_center = (abs(az_val - 270.0) < 0.2)
+            cv2.line(img, (sx, tm), (sx, tm + ph), (80, 60, 45) if is_center else (55, 40, 30), 1)
+            cv2.putText(img, f'{az_val:.0f}*', (sx - 14, tm + ph + 18), cv2.FONT_HERSHEY_SIMPLEX, 0.33, (248, 189, 56) if is_center else (184, 163, 148), 1, cv2.LINE_AA)
 
     # Garis Ufuk Hakiki dan Ufuk Laut Dip ditiadakan sesuai permintaan
 
@@ -3206,6 +3203,8 @@ def fast_render_plot_image(azimuths, elevations, dip_deg, target_az=None, target
     if target_az is not None:
         t_alt_val = target_alt if target_alt is not None else 0.0
         tx, ty = to_screen(target_az, t_alt_val)
+        tx = max(lm, min(lm + pw, tx))
+        ty = max(tm, min(tm + ph, ty))
         cv2.line(img, (tx, tm), (tx, tm + ph), (251, 64, 224), 2, cv2.LINE_AA)
         cv2.circle(img, (tx, ty), 5, (251, 64, 224), -1, cv2.LINE_AA)
         cv2.circle(img, (tx, ty), 8, (255, 255, 255), 1, cv2.LINE_AA)
@@ -3240,9 +3239,9 @@ def api_analyze():
         return jsonify({"error": "Format gambar tidak didukung"}), 400
 
     h, w = image_bgr.shape[:2]
-    hfov_val = float(data.get("hfov", 20.0))
+    hfov_val = float(data.get("hfov", 60.0))
     if hfov_val <= 0:
-        hfov_val = 20.0
+        hfov_val = 60.0
     hfov_rad = math.radians(hfov_val)
     vfov_val = math.degrees(2.0 * math.atan((h / w) * math.tan(hfov_rad / 2.0)))
 
@@ -3355,8 +3354,8 @@ def api_recalculate_target():
     target_analysis["target_alt"] = target_alt
     target_analysis["dip_deg"] = prof["dip_deg"]
 
-    hfov_val = float(LAST_ANALYSIS.get("hfov", 20.0))
-    vfov_val = float(LAST_ANALYSIS.get("vfov", 11.25))
+    hfov_val = float(LAST_ANALYSIS.get("hfov", 60.0))
+    vfov_val = float(LAST_ANALYSIS.get("vfov", 36.0))
 
     overlay_bgr = detector.render_overlay(
         image_bgr=LAST_ANALYSIS["image_bgr"],
@@ -3403,8 +3402,8 @@ def _generate_current_pdf_path(location_name=None, observer_notes=None, recommen
     rec = recommendation_text or ta.get("recommendation", "Lokasi rukyatul hilal tervalidasi.")
     loc = location_name or "Pos Observasi Falak Lapangan"
 
-    hfov_val = float(LAST_ANALYSIS.get("hfov", 20.0))
-    vfov_val = float(LAST_ANALYSIS.get("vfov", 11.25))
+    hfov_val = float(LAST_ANALYSIS.get("hfov", 60.0))
+    vfov_val = float(LAST_ANALYSIS.get("vfov", 36.0))
 
     export_pdf_report(
         output_pdf_path=pdf_path,
