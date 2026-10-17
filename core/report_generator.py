@@ -67,6 +67,7 @@ def export_pdf_report(
     observer_notes: str = "",
     recommendation_text: str = "",
     instansi_name: str = "FAKULTAS SYARIAH - LABORATORIUM ASTRONOMI & ILMU FALAK",
+    observer_name: str = "",
 ) -> str:
     """
     Menghasilkan dokumen laporan pemetaan ufuk mar'i dalam format PDF.
@@ -242,6 +243,8 @@ def export_pdf_report(
     dms_lat = format_dms(latitude, is_lat=True)
     dms_lon = format_dms(longitude, is_lon=True)
     stats = profile_data.get("stats", {})
+    t_alt_val = target_analysis.get("target_alt", target_analysis.get("alt_obstacle", 0.0)) if target_analysis else 0.0
+    elev_str_val = f"{t_alt_val:+.2f}° / {get_elev_cm_str(t_alt_val)} cm".replace(".", ",")
 
     meta_table_data = [
         [
@@ -259,8 +262,8 @@ def export_pdf_report(
         [
             Paragraph("<b>Bujur Tempat (lambda):</b>", body_style),
             Paragraph(f"{dms_lon} ({longitude:+.5f}°)", body_style),
-            Paragraph("<b>Ketinggian Tempat (h):</b>", body_style),
-            Paragraph(f"{elevation_m:.1f} m dpl", body_style),
+            Paragraph("<b>Sudut Elevasi / cm:</b>", body_style),
+            Paragraph(elev_str_val, body_style),
         ],
     ]
 
@@ -303,59 +306,11 @@ def export_pdf_report(
     elements.append(plot_flowable)
     elements.append(Spacer(1, 4))
 
-    # PINDAH KE HALAMAN 2: TABEL ANALISIS SASARAN, REKOMENDASI & PENGESAHAN
+    # PINDAH KE HALAMAN 2: DAFTAR OBJEK MENONJOL, REKOMENDASI & PENGESAHAN
     elements.append(PageBreak())
 
-    # TABEL 2: ANALISIS TITIK BIDIK SASARAN (Misal Azimut Hilal)
-    elements.append(Paragraph("III. HASIL ANALISIS SUDUT HALANGAN UFUK PADA TITIK SASARAN", section_style))
-
-    if target_analysis:
-        t_az = target_analysis.get("target_az", az_center)
-        t_alt = target_analysis.get("target_alt", target_analysis.get("alt_obstacle", 0.0))
-        t_status = target_analysis.get("status", "Bebas Halangan")
-        t_cat = target_analysis.get("category", "-")
-        t_sev = target_analysis.get("severity", "Baik")
-
-        analysis_table_data = [
-            [
-                Paragraph("<b>Parameter Sasaran</b>", body_style),
-                Paragraph("<b>Nilai Kalkulasi</b>", body_style),
-                Paragraph("<b>Keterangan Astronomis</b>", body_style),
-            ],
-            [
-                Paragraph("Azimut Bidikan Sasaran:", body_style),
-                Paragraph(f"<b>{t_az:.2f}°</b>", body_style),
-                Paragraph("Arah kompas target rukyatul hilal / matahari", body_style),
-            ],
-            [
-                Paragraph("Tinggi Halangan Mar'i (Alt):", body_style),
-                Paragraph(f"<b>{t_alt:+.3f}° / {get_elev_cm_str(t_alt)} cm</b> ({format_dms(t_alt)})", body_style),
-                Paragraph("Sudut elevasi kontur terhadap ufuk hakiki (0°)", body_style),
-            ],
-            [
-                Paragraph("Status & Klasifikasi Halangan:", body_style),
-                Paragraph(f"<b>{t_status}</b> ({t_sev})", body_style),
-                Paragraph(t_cat, body_style),
-            ],
-        ]
-
-        t_analysis = Table(analysis_table_data, colWidths=[150, 160, 210])
-        t_analysis.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#f0f0f0")),
-            ("BOX", (0, 0), (-1, -1), 0.8, colors.black),
-            ("INNERGRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#cccccc")),
-            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-            ("TOPPADDING", (0, 0), (-1, -1), 2.5),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 2.5),
-        ]))
-        elements.append(t_analysis)
-    else:
-        elements.append(Paragraph("<i>Belum ada titik sasaran azimut yang dipilih.</i>", body_style))
-
-    elements.append(Spacer(1, 8))
-
     # TABEL OBJEK HALANGAN MENONJOL (PROMINENT OBSTACLES)
-    elements.append(Paragraph("IV. DAFTAR OBJEK HALANGAN MENONJOL PADA KONTUR UFUK MAR'I", section_style))
+    elements.append(Paragraph("III. DAFTAR OBJEK HALANGAN MENONJOL PADA KONTUR UFUK MAR'I", section_style))
 
     body_center = ParagraphStyle("DocBodyCenter", parent=body_style, alignment=1)
     header_style = ParagraphStyle("DocHeaderCenter", parent=body_style, fontName="Helvetica-Bold", alignment=1)
@@ -398,14 +353,14 @@ def export_pdf_report(
         ("BOX", (0, 0), (-1, -1), 0.8, colors.black),
         ("INNERGRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#cccccc")),
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ("TOPPADDING", (0, 0), (-1, -1), 3),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+        ("TOPPADDING", (0, 0), (-1, -1), 3.5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 3.5),
     ]))
     elements.append(t_obs)
-    elements.append(Spacer(1, 10))
+    elements.append(Spacer(1, 14))
 
     # BAGIAN CATATAN & REKOMENDASI KELAYAKAN
-    elements.append(Paragraph("V. REKOMENDASI KELAYAKAN LOKASI RUKYAT & CATATAN LAPANGAN", section_style))
+    elements.append(Paragraph("IV. REKOMENDASI KELAYAKAN LOKASI RUKYAT & CATATAN LAPANGAN", section_style))
 
     rec_content = recommendation_text.strip() if recommendation_text.strip() else (
         target_analysis.get("recommendation", "Lokasi memiliki keterbukaan ufuk yang baik.")
@@ -413,7 +368,17 @@ def export_pdf_report(
     )
     notes_content = observer_notes.strip() if observer_notes.strip() else "Tidak ada catatan tambahan kondisi atmosfer/lapangan."
 
+    obs_name_str = observer_name.strip() if observer_name and observer_name.strip() else "Tim Falak & Astronomi"
+
     rec_table_data = [
+        [
+            Paragraph("<b>Nama Lokasi / Pos:</b>", body_style),
+            Paragraph(location_name or "Pos Observasi Falak Lapangan", body_style),
+        ],
+        [
+            Paragraph("<b>Petugas Pengamat:</b>", body_style),
+            Paragraph(obs_name_str, body_style),
+        ],
         [
             Paragraph("<b>Evaluasi Kelayakan Rukyat:</b>", body_style),
             Paragraph(rec_content, body_style),
@@ -430,11 +395,11 @@ def export_pdf_report(
         ("BOX", (0, 0), (-1, -1), 0.8, colors.black),
         ("INNERGRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#cccccc")),
         ("VALIGN", (0, 0), (-1, -1), "TOP"),
-        ("TOPPADDING", (0, 0), (-1, -1), 3),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+        ("TOPPADDING", (0, 0), (-1, -1), 3.5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 3.5),
     ]))
     elements.append(t_rec)
-    elements.append(Spacer(1, 14))
+    elements.append(Spacer(1, 18))
 
     # TANDA TANGAN PENGESAHAN (Halaman 2)
     sig_table_data = [
@@ -443,11 +408,11 @@ def export_pdf_report(
             Paragraph("Mengetahui / Memvalidasi:<br/>Ketua Laboratorium Falak,", ParagraphStyle("S2", parent=body_style, alignment=1, textColor=colors.black)),
         ],
         [
-            Spacer(1, 26),
-            Spacer(1, 26),
+            Spacer(1, 28),
+            Spacer(1, 28),
         ],
         [
-            Paragraph("( ...................................................... )", ParagraphStyle("S3", parent=body_style, alignment=1, textColor=colors.black)),
+            Paragraph(f"( {obs_name_str} )", ParagraphStyle("S3", parent=body_style, alignment=1, textColor=colors.black)),
             Paragraph("( ...................................................... )", ParagraphStyle("S4", parent=body_style, alignment=1, textColor=colors.black)),
         ],
     ]

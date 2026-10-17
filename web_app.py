@@ -2592,7 +2592,8 @@ HTML_TEMPLATE = """
 
     function downloadCurrentPdf() {
       const loc = encodeURIComponent(document.getElementById('editLocation').value.trim() || "Pos Observasi");
-      window.open('/api/download_pdf?loc=' + loc, '_blank');
+      const obs = encodeURIComponent(document.getElementById('editObserver')?.value.trim() || "Tim Falak & Astronomi");
+      window.open('/api/download_pdf?loc=' + loc + '&obs=' + obs, '_blank');
     }
 
     function downloadExcel() {
@@ -3464,7 +3465,7 @@ def api_recalculate_target():
     })
 
 
-def _generate_current_pdf_path(location_name=None, observer_notes=None, recommendation_text=None) -> str:
+def _generate_current_pdf_path(location_name=None, observer_name=None, observer_notes=None, recommendation_text=None) -> str:
     global LAST_ANALYSIS
     if not LAST_ANALYSIS:
         raise ValueError("Belum ada data analisis aktif")
@@ -3477,6 +3478,7 @@ def _generate_current_pdf_path(location_name=None, observer_notes=None, recommen
     desc = observer_notes or f"Analisis berbasis Computer Vision pada azimut {ta['target_az']:.2f}°. Kondisi: {ta.get('category', 'Ufuk Mar-i')}."
     rec = recommendation_text or ta.get("recommendation", "Lokasi rukyatul hilal tervalidasi.")
     loc = location_name or "Pos Observasi Falak Lapangan"
+    obs = observer_name or "Tim Falak & Astronomi"
 
     hfov_val = float(LAST_ANALYSIS.get("hfov", 60.0))
     vfov_val = float(LAST_ANALYSIS.get("vfov", 36.0))
@@ -3497,6 +3499,7 @@ def _generate_current_pdf_path(location_name=None, observer_notes=None, recommen
         target_analysis=ta,
         observer_notes=desc,
         recommendation_text=rec,
+        observer_name=obs,
     )
     return pdf_path
 
@@ -3506,10 +3509,11 @@ def api_preview_pdf():
     try:
         data = request.json or {} if request.method == "POST" else {}
         loc = data.get("location_name") or request.args.get("loc")
+        obs = data.get("observer_name") or request.args.get("obs")
         notes = data.get("observer_notes")
         rec = data.get("recommendation_text")
 
-        pdf_path = _generate_current_pdf_path(location_name=loc, observer_notes=notes, recommendation_text=rec)
+        pdf_path = _generate_current_pdf_path(location_name=loc, observer_name=obs, observer_notes=notes, recommendation_text=rec)
         pdf = pypdfium2.PdfDocument(pdf_path)
         pages_b64 = []
         for i in range(len(pdf)):
@@ -3531,7 +3535,8 @@ def api_preview_pdf():
 def api_download_pdf():
     try:
         loc = request.args.get("loc")
-        pdf_path = _generate_current_pdf_path(location_name=loc)
+        obs = request.args.get("obs")
+        pdf_path = _generate_current_pdf_path(location_name=loc, observer_name=obs)
         return send_file(pdf_path, as_attachment=True, download_name="Laporan_Ufuk_Mar'i.pdf")
     except Exception as e:
         return f"Gagal membuat PDF: {str(e)}", 400
