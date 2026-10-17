@@ -720,7 +720,7 @@ HTML_TEMPLATE = """
           </div>
 
           <div class="grid-2">
-            <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('galleryInput').click()">
+            <button type="button" class="btn btn-secondary btn-sm" onclick="stopLiveCamera(); document.getElementById('galleryInput').click()">
               📁 Buka File / Foto Ufuk
             </button>
             <button type="button" class="btn btn-primary btn-sm" onclick="startLiveCamera()">
@@ -806,10 +806,10 @@ HTML_TEMPLATE = """
             </div>
           </div>
 
-          <div class="photo-area" id="dropArea">
+          <div class="photo-area" id="dropArea" onclick="stopLiveCamera(); document.getElementById('galleryInput').click()" style="cursor: pointer;" title="Klik untuk membuka file atau seret file gambar ke sini (Bisa Drag & Drop / Ctrl+V Paste)">
             <p style="font-size: 1.8rem; margin-bottom: 4px;">🏞️</p>
             <p style="font-weight: 700; color: #38bdf8; font-size: 0.88rem;" id="lblPhotoStatus">Belum ada foto yang dipilih</p>
-            <p style="font-size: 0.74rem; color: #64748b; margin-top: 3px;">Klik 'Buka File / Foto Ufuk' atau gunakan Kamera / Webcam Laptop</p>
+            <p style="font-size: 0.74rem; color: #64748b; margin-top: 3px;">Klik 'Buka File', klik area ini, atau Drag & Drop / Paste foto</p>
           </div>
 
           <img id="rawPreview" class="preview-img" alt="Preview Foto Aktif">
@@ -1715,13 +1715,33 @@ HTML_TEMPLATE = """
           cameraStream = await navigator.mediaDevices.getUserMedia(constraints);
         } catch (strictErr) {
           console.warn("Kamera gagal dengan constraint ideal, mencoba konfigurasi fleksibel:", strictErr);
-          cameraStream = await navigator.mediaDevices.getUserMedia({
-            video: targetId ? { deviceId: targetId } : true,
-            audio: false
-          });
+          try {
+            cameraStream = await navigator.mediaDevices.getUserMedia({
+              video: targetId ? { deviceId: { ideal: targetId } } : true,
+              audio: false
+            });
+          } catch (looseErr) {
+            console.warn("Mencoba kamera default:", looseErr);
+            cameraStream = await navigator.mediaDevices.getUserMedia({
+              video: true,
+              audio: false
+            });
+          }
         }
 
+        try {
+          const vTracks = cameraStream.getVideoTracks();
+          if (vTracks && vTracks.length > 0 && vTracks[0].getSettings) {
+            const settings = vTracks[0].getSettings();
+            if (settings.deviceId) {
+              currentCameraDeviceId = settings.deviceId;
+            }
+          }
+        } catch (e) {}
+
         video.srcObject = cameraStream;
+        await updateCameraDeviceList();
+
         video.onloadedmetadata = () => {
           video.play().catch(e => console.warn(e));
           drawLiveHudLoop();
@@ -2170,13 +2190,13 @@ HTML_TEMPLATE = """
         const data = await res.json();
         if (data.status === 'success') {
           if (data.copied_count > 0) {
-            alert(`Berhasil mengimpor ${data.copied_count} foto dari kamera ke folder 'hasil_jepretan'!\n\nFile:\n${data.files.join('\n')}`);
+            alert(`Berhasil mengimpor ${data.copied_count} foto dari kamera ke folder 'hasil_jepretan'!\\n\\nFile:\\n${data.files.join('\\n')}`);
             if (lbl) {
               lbl.innerHTML = `Berhasil impor <b style="color: #4ade80;">${data.copied_count} foto</b> dari SD card ke <b>hasil_jepretan/</b>`;
             }
             openCapturesFolder();
           } else {
-            alert("Tidak ditemukan file foto baru di kartu SD kamera yang terpasang.\n\nTips: Saat kamera berada di mode Webcam, foto diambil menggunakan tombol 'AMBIL FRAME (SPASI)' dan otomatis tersimpan.");
+            alert("Tidak ditemukan file foto baru di kartu SD kamera yang terpasang.\\n\\nTips: Saat kamera berada di mode Webcam, foto diambil menggunakan tombol 'AMBIL FRAME (SPASI)' dan otomatis tersimpan.");
             if (lbl) {
               lbl.innerHTML = `hasil_jepretan/ (Tidak ada foto baru di kartu SD)`;
             }
@@ -2195,7 +2215,7 @@ HTML_TEMPLATE = """
           liveCompassTilt = data.tilt || 0.0;
           const inp = document.getElementById('inpTilt');
           if (inp) inp.value = (data.tilt || 0.0).toFixed(1);
-          alert(`🎯 Kalibrasi Kemiringan Sukses!\nPosisi kamera fisik saat ini berhasil dinolkan menjadi 0.0° Level (Datar).\nOffset tersimpan: ${data.tilt_offset}°`);
+          alert(`🎯 Kalibrasi Kemiringan Sukses!\\nPosisi kamera fisik saat ini berhasil dinolkan menjadi 0.0° Level (Datar).\\nOffset tersimpan: ${data.tilt_offset}°`);
         }
       } catch (err) {
         alert("Gagal mengalibrasi kemiringan: " + err.message);
@@ -2836,6 +2856,50 @@ HTML_TEMPLATE = """
         resetImgZoom();
       });
     }
+
+    // Dukungan Drag & Drop pada area pemilihan foto
+    const dropAreaEl = document.getElementById('dropArea');
+    if (dropAreaEl) {
+      ['dragenter', 'dragover'].forEach(evt => {
+        dropAreaEl.addEventListener(evt, e => {
+          e.preventDefault();
+          e.stopPropagation();
+          dropAreaEl.style.borderColor = '#38bdf8';
+          dropAreaEl.style.backgroundColor = '#1e293b';
+        }, false);
+      });
+      ['dragleave', 'drop'].forEach(evt => {
+        dropAreaEl.addEventListener(evt, e => {
+          e.preventDefault();
+          e.stopPropagation();
+          dropAreaEl.style.borderColor = '#334155';
+          dropAreaEl.style.backgroundColor = '#0f172a';
+        }, false);
+      });
+      dropAreaEl.addEventListener('drop', e => {
+        const dt = e.dataTransfer;
+        if (dt && dt.files && dt.files.length > 0) {
+          const fakeInput = { files: dt.files, id: 'galleryInput' };
+          onFileSelected(fakeInput);
+        }
+      });
+    }
+
+    // Dukungan paste gambar langsung (Ctrl+V) dari clipboard
+    window.addEventListener('paste', function(e) {
+      const items = (e.clipboardData || (e.originalEvent && e.originalEvent.clipboardData) || {}).items;
+      if (!items) return;
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].kind === 'file' && items[i].type.startsWith('image/')) {
+          const file = items[i].getAsFile();
+          if (file) {
+            compressAndSetImage(file, activeSlotIndex, "Foto Hasil Tempel (Paste Clipboard)");
+            stopLiveCamera();
+          }
+          break;
+        }
+      }
+    });
 
     document.addEventListener('DOMContentLoaded', function() {
       initInteractiveImage();
