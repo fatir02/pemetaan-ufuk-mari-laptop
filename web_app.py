@@ -13,6 +13,7 @@ import os
 import sys
 import io
 import time
+import math
 import base64
 import subprocess
 import numpy as np
@@ -918,7 +919,20 @@ HTML_TEMPLATE = """
             <span id="compassStatusText" style="color: #94a3b8;">🧭 Kompas Hardware: Memeriksa COM7...</span>
           </div>
 
-          <div class="grid-3">
+          <div class="grid-2" style="margin-bottom: 12px;">
+            <div class="form-group">
+              <label>Rentang Azimut / HFOV (°):</label>
+              <input type="number" id="inpHfov" value="20.0" step="1.0" min="5.0" max="60.0">
+              <span style="font-size: 0.68rem; color: #38bdf8;">Selisih 20° (Rentang 260° s.d. 280°)</span>
+            </div>
+            <div class="form-group">
+              <label>Tinggi Alat (mdpl):</label>
+              <input type="number" id="inpAlt" value="45.0" step="1" placeholder="45">
+              <span style="font-size: 0.68rem; color: #64748b;">Meter dpl (Ketinggian pengamat)</span>
+            </div>
+          </div>
+
+          <div class="grid-2">
             <div class="form-group">
               <label>Lintang / Lat (°):</label>
               <input type="number" id="inpLat" value="-7.9800" step="0.0001" placeholder="-7.9800">
@@ -928,11 +942,6 @@ HTML_TEMPLATE = """
               <label>Bujur / Lon (°):</label>
               <input type="number" id="inpLon" value="110.3061" step="0.0001" placeholder="110.3061">
               <span style="font-size: 0.68rem; color: #64748b;">BT: plus (+), BB: minus (-)</span>
-            </div>
-            <div class="form-group">
-              <label>Tinggi (mdpl):</label>
-              <input type="number" id="inpAlt" value="45.0" step="1" placeholder="45">
-              <span style="font-size: 0.68rem; color: #64748b;">Meter dpl (Ketinggian alat)</span>
             </div>
           </div>
 
@@ -2362,6 +2371,7 @@ HTML_TEMPLATE = """
         image_base64: selectedImageBase64,
         azimuth: parseFloat(document.getElementById('inpAzimuth').value) || 270.0,
         tilt: parseFloat(document.getElementById('inpTilt').value) || 0.0,
+        hfov: parseFloat(document.getElementById('inpHfov')?.value) || 20.0,
         latitude: parseFloat(document.getElementById('inpLat').value) || -7.98,
         longitude: parseFloat(document.getElementById('inpLon').value) || 110.306,
         altitude: parseFloat(document.getElementById('inpAlt').value) || 45.0
@@ -3252,7 +3262,6 @@ def api_analyze():
     lat = float(data.get("latitude", -7.98))
     lon = float(data.get("longitude", 110.3061))
     alt = float(data.get("altitude", 45.0))
-
     if not raw_b64:
         return jsonify({"error": "Citra kosong"}), 400
 
@@ -3266,6 +3275,11 @@ def api_analyze():
         return jsonify({"error": "Format gambar tidak didukung"}), 400
 
     h, w = image_bgr.shape[:2]
+    hfov_val = float(data.get("hfov", 20.0))
+    if hfov_val <= 0:
+        hfov_val = 20.0
+    hfov_rad = math.radians(hfov_val)
+    vfov_val = math.degrees(2.0 * math.atan((h / w) * math.tan(hfov_rad / 2.0)))
 
     # Ekstraksi kontur teroptimasi vektorisasi NumPy
     horizon_y, mask = detector.detect_horizon(
@@ -3281,8 +3295,8 @@ def api_analyze():
         img_w=w,
         img_h=h,
         az_center=azimuth,
-        hfov=15.0,
-        vfov=8.5,
+        hfov=hfov_val,
+        vfov=vfov_val,
         tilt_center=tilt,
         elevation_m=alt
     )
@@ -3305,8 +3319,8 @@ def api_analyze():
         target_az=target_az,
         dip_deg=profile_data["dip_deg"],
         az_center=azimuth,
-        hfov=15.0,
-        vfov=8.5,
+        hfov=hfov_val,
+        vfov=vfov_val,
         tilt_center=tilt,
         prominent_obstacles=profile_data.get("prominent_obstacles", []),
         show_prominent_peaks=True,
@@ -3318,11 +3332,14 @@ def api_analyze():
     # Render kurva cepat OpenCV
     plot_b64 = fast_render_plot_image(az_arr, el_arr, profile_data["dip_deg"], target_az, target_alt)
 
-    # Downsample kurva untuk komputasi instan di ponsel klien (150 poin)
-    curve_step = max(1, len(az_arr) // 150)
+    # Downsample kurva untuk komputasi instan di ponsel klien (termasuk titik batas awal dan akhir)
+    curve_step = max(1, len(az_arr) // 160)
+    indices = list(range(0, len(az_arr), curve_step))
+    if indices[-1] != len(az_arr) - 1:
+        indices.append(len(az_arr) - 1)
     profile_curve = {
-        "az": [float(az_arr[i]) for i in range(0, len(az_arr), curve_step)],
-        "el": [float(el_arr[i]) for i in range(0, len(el_arr), curve_step)]
+        "az": [float(az_arr[i]) for i in indices],
+        "el": [float(el_arr[i]) for i in indices]
     }
 
     LAST_ANALYSIS = {
@@ -3335,6 +3352,8 @@ def api_analyze():
         "longitude": lon,
         "altitude": alt,
         "azimuth": azimuth,
+        "hfov": hfov_val,
+        "vfov": vfov_val,
         "tilt": tilt,
         "w": w,
         "h": h,
@@ -3371,6 +3390,9 @@ def api_recalculate_target():
     target_analysis["target_alt"] = target_alt
     target_analysis["dip_deg"] = prof["dip_deg"]
 
+    hfov_val = float(LAST_ANALYSIS.get("hfov", 20.0))
+    vfov_val = float(LAST_ANALYSIS.get("vfov", 11.25))
+
     overlay_bgr = detector.render_overlay(
         image_bgr=LAST_ANALYSIS["image_bgr"],
         horizon_y=LAST_ANALYSIS["horizon_y"],
@@ -3379,8 +3401,8 @@ def api_recalculate_target():
         target_az=target_az,
         dip_deg=prof["dip_deg"],
         az_center=LAST_ANALYSIS["azimuth"],
-        hfov=15.0,
-        vfov=8.5,
+        hfov=hfov_val,
+        vfov=vfov_val,
         tilt_center=LAST_ANALYSIS["tilt"],
         prominent_obstacles=prof.get("prominent_obstacles", []),
         show_prominent_peaks=True,
@@ -3416,6 +3438,9 @@ def _generate_current_pdf_path(location_name=None, observer_notes=None, recommen
     rec = recommendation_text or ta.get("recommendation", "Lokasi rukyatul hilal tervalidasi.")
     loc = location_name or "Pos Observasi Falak Lapangan"
 
+    hfov_val = float(LAST_ANALYSIS.get("hfov", 20.0))
+    vfov_val = float(LAST_ANALYSIS.get("vfov", 11.25))
+
     export_pdf_report(
         output_pdf_path=pdf_path,
         location_name=loc,
@@ -3423,8 +3448,8 @@ def _generate_current_pdf_path(location_name=None, observer_notes=None, recommen
         longitude=LAST_ANALYSIS["longitude"],
         elevation_m=LAST_ANALYSIS["altitude"],
         az_center=LAST_ANALYSIS["azimuth"],
-        hfov=15.0,
-        vfov=8.5,
+        hfov=hfov_val,
+        vfov=vfov_val,
         tilt_center=LAST_ANALYSIS["tilt"],
         dip_deg=LAST_ANALYSIS["profile_data"]["dip_deg"],
         profile_data=LAST_ANALYSIS["profile_data"],
