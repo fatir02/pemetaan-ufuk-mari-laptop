@@ -1172,13 +1172,11 @@ HTML_TEMPLATE = """
         <table id="numericTable" style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.82rem;">
           <thead>
             <tr style="background: #0f172a; color: #38bdf8; border-bottom: 2px solid #233147; position: sticky; top: 0; z-index: 2;">
-              <th style="padding: 10px 12px; font-weight: bold; border-right: 1px solid #1e293b;">No</th>
-              <th style="padding: 10px 12px; font-weight: bold; border-right: 1px solid #1e293b;">Azimut (°)</th>
-              <th style="padding: 10px 12px; font-weight: bold; border-right: 1px solid #1e293b;">Elevasi Mar'i (°)</th>
-              <th style="padding: 10px 12px; font-weight: bold; border-right: 1px solid #1e293b;">Format DMS Falak</th>
-              <th style="padding: 10px 12px; font-weight: bold; border-right: 1px solid #1e293b;">Selisih Hakiki (Δ0.00°)</th>
-              <th style="padding: 10px 12px; font-weight: bold; border-right: 1px solid #1e293b;">Selisih Dip (ΔLaut)</th>
-              <th style="padding: 10px 12px; font-weight: bold;">Status Rukyatul Hilal</th>
+              <th style="padding: 10px 12px; font-weight: bold; border-right: 1px solid #1e293b; width: 60px; text-align: center;">No</th>
+              <th style="padding: 10px 12px; font-weight: bold; border-right: 1px solid #1e293b; text-align: center;">Azimut (°)</th>
+              <th style="padding: 10px 12px; font-weight: bold; border-right: 1px solid #1e293b; text-align: center;">Elevasi (°)</th>
+              <th style="padding: 10px 12px; font-weight: bold; border-right: 1px solid #1e293b; text-align: center;">Data Lokasi</th>
+              <th style="padding: 10px 12px; font-weight: bold; text-align: center;">Status Kelayakan</th>
             </tr>
           </thead>
           <tbody id="numericTableBody">
@@ -2717,16 +2715,18 @@ HTML_TEMPLATE = """
 
       document.getElementById('tblSampleCount').innerText = selectedRows.length + " Titik Data";
 
+      const latVal = parseFloat(document.getElementById('inpLat')?.value) || -7.98;
+      const lonVal = parseFloat(document.getElementById('inpLon')?.value) || 110.3061;
+      const altVal = parseFloat(document.getElementById('inpAlt')?.value) || 45;
+      const locStr = (clientProfileCurve && clientProfileCurve.location_str)
+        ? clientProfileCurve.location_str
+        : `${latVal.toFixed(4)}°, ${lonVal.toFixed(4)}° (${Math.round(altVal)}m)`;
+
       let html = "";
       selectedRows.forEach((row, idx) => {
         const el = row.el;
         const az = row.az;
         const elStr = (el >= 0 ? "+" : "") + el.toFixed(2) + "°";
-        const dmsStr = formatDms(el);
-        const deltaHakiki = el - 0.0;
-        const deltaHakikiStr = (deltaHakiki >= 0 ? "+" : "") + deltaHakiki.toFixed(2) + "°";
-        const deltaDip = el - (-dip);
-        const deltaDipStr = (deltaDip >= 0 ? "+" : "") + deltaDip.toFixed(2) + "°";
 
         let badgeHtml = "";
         if (el <= -dip + 0.05) {
@@ -2741,13 +2741,11 @@ HTML_TEMPLATE = """
 
         const bgCol = idx % 2 === 0 ? '#131b2a' : '#172235';
         html += `<tr style="background: ${bgCol}; border-bottom: 1px solid #1e293b;">
-          <td style="padding: 8px 12px; color: #64748b; font-family: monospace; border-right: 1px solid #1e293b;">${idx + 1}</td>
-          <td style="padding: 8px 12px; font-weight: bold; color: #38bdf8; font-family: monospace; border-right: 1px solid #1e293b;">${az.toFixed(2)}°</td>
-          <td style="padding: 8px 12px; font-weight: bold; color: #f8fafc; font-family: monospace; border-right: 1px solid #1e293b;">${elStr}</td>
-          <td style="padding: 8px 12px; color: #cbd5e1; font-family: monospace; border-right: 1px solid #1e293b;">${dmsStr}</td>
-          <td style="padding: 8px 12px; color: #94a3b8; font-family: monospace; border-right: 1px solid #1e293b;">${deltaHakikiStr}</td>
-          <td style="padding: 8px 12px; color: #94a3b8; font-family: monospace; border-right: 1px solid #1e293b;">${deltaDipStr}</td>
-          <td style="padding: 8px 12px;">${badgeHtml}</td>
+          <td style="padding: 8px 12px; color: #64748b; font-family: monospace; border-right: 1px solid #1e293b; text-align: center;">${idx + 1}</td>
+          <td style="padding: 8px 12px; font-weight: bold; color: #38bdf8; font-family: monospace; border-right: 1px solid #1e293b; text-align: center;">${az.toFixed(2)}°</td>
+          <td style="padding: 8px 12px; font-weight: bold; color: #f8fafc; font-family: monospace; border-right: 1px solid #1e293b; text-align: center;">${elStr}</td>
+          <td style="padding: 8px 12px; color: #cbd5e1; font-family: monospace; border-right: 1px solid #1e293b; text-align: center;">${locStr}</td>
+          <td style="padding: 8px 12px; text-align: center;">${badgeHtml}</td>
         </tr>`;
       });
       tbody.innerHTML = html;
@@ -2760,7 +2758,7 @@ HTML_TEMPLATE = """
         alert("Tidak ada data untuk disalin.");
         return;
       }
-      const headerRow = ["No", "Azimut (°)", "Elevasi Mar'i (°)", "Format DMS", "Selisih Hakiki (Δ0°)", "Selisih Laut (ΔDip)", "Status"].join("\\t");
+      const headerRow = ["No", "Azimut (°)", "Elevasi (°)", "Data Lokasi", "Status Kelayakan"].join("\\t");
       let tsv = headerRow + "\\n";
       rows.forEach(r => {
         const cells = Array.from(r.querySelectorAll('td')).map(c => c.innerText.trim());
@@ -3507,7 +3505,11 @@ def api_download_csv():
     os.makedirs(exports_dir, exist_ok=True)
     csv_path = os.path.join(exports_dir, f"Data_Ufuk_Web_{int(time.time())}.csv")
 
-    loc = request.args.get("loc", "Pos Observasi Falak (Laptop)").strip() or "Pos Observasi Falak (Laptop)"
+    lat = LAST_ANALYSIS.get("latitude", -7.98)
+    lon = LAST_ANALYSIS.get("longitude", 110.3061)
+    alt = LAST_ANALYSIS.get("altitude", 45.0)
+    data_loc = f"{lat:.4f}°, {lon:.4f}° ({int(alt)}m)"
+
     step_arg = request.args.get("step", None)
     sampling_step = None
     if step_arg and step_arg != "all":
@@ -3519,7 +3521,7 @@ def api_download_csv():
     export_csv_data(
         output_csv_path=csv_path,
         profile_data=LAST_ANALYSIS["profile_data"],
-        location_name=loc,
+        location_name=data_loc,
         az_center=LAST_ANALYSIS["azimuth"],
         dip_deg=LAST_ANALYSIS["profile_data"]["dip_deg"],
         sampling_step=sampling_step,
@@ -3538,7 +3540,11 @@ def api_download_excel():
     os.makedirs(exports_dir, exist_ok=True)
     excel_path = os.path.join(exports_dir, f"Data_Ufuk_Web_{int(time.time())}.xlsx")
 
-    loc = request.args.get("loc", "Pos Observasi Falak (Laptop)").strip() or "Pos Observasi Falak (Laptop)"
+    lat = LAST_ANALYSIS.get("latitude", -7.98)
+    lon = LAST_ANALYSIS.get("longitude", 110.3061)
+    alt = LAST_ANALYSIS.get("altitude", 45.0)
+    data_loc = f"{lat:.4f}°, {lon:.4f}° ({int(alt)}m)"
+
     step_arg = request.args.get("step", "0.5")
     sampling_step = None
     if step_arg and step_arg != "all":
@@ -3550,7 +3556,7 @@ def api_download_excel():
     export_excel_data(
         output_excel_path=excel_path,
         profile_data=LAST_ANALYSIS["profile_data"],
-        location_name=loc,
+        location_name=data_loc,
         az_center=LAST_ANALYSIS["azimuth"],
         dip_deg=LAST_ANALYSIS["profile_data"]["dip_deg"],
         sampling_step=sampling_step,

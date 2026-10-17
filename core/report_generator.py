@@ -443,8 +443,8 @@ def export_csv_data(
     sampling_step: Optional[float] = None,
 ) -> str:
     """
-    Mengekspor data numerik profil ufuk (Azimuth, Elevation, Horizon_Y) ke file CSV
-    dalam format tabel yang rapi, berstandar Excel (UTF-8 BOM + auto-delimiter sep=,).
+    Mengekspor data numerik profil ufuk ke file CSV dengan format 5 kolom ringkas
+    sesuai tampilan tabel preview (No, Azimut, Elevasi, Data Lokasi, Status Kelayakan).
     """
     os.makedirs(os.path.dirname(os.path.abspath(output_csv_path)), exist_ok=True)
     dip_val = float(dip_deg) if dip_deg is not None else float(profile_data.get("dip_deg", 0.0))
@@ -459,11 +459,10 @@ def export_csv_data(
         f.write(f"Kerendahan Ufuk Laut Dip,\"-{dip_val:.4f}°\"\n")
         f.write(f"Waktu Ekspor,\"{time.strftime('%Y-%m-%d %H:%M:%S')} WIB\"\n")
         f.write("\n")
-        f.write("No,Kolom (Pixel X),Azimut (°),Elevasi Halangan (°),Elevasi (DMS),Selisih Hakiki (Δ0°),Selisih Laut (ΔDip),Status Kelayakan Rukyat\n")
+        f.write("No,Azimut (°),Elevasi (°),Data Lokasi,Status Kelayakan\n")
         for r in table_rows:
             f.write(
-                f"{r['no']},{r['col_x']},{r['az']:.4f},{r['el']:+.4f},\"{r['dms']}\","
-                f"{r['delta_hakiki']:+.4f},{r['delta_dip']:+.4f},\"{r['status']}\"\n"
+                f"{r['no']},{r['az']:.2f},{r['el']:+.2f},\"{safe_loc}\",\"{r['status']}\"\n"
             )
 
     return output_csv_path
@@ -478,8 +477,8 @@ def export_excel_data(
     sampling_step: Optional[float] = None,
 ) -> str:
     """
-    Mengekspor data numerik profil ufuk ke file Excel (.xlsx) dengan format tabel
-    profesional, grid border, header berwarna, auto-width, dan filter aktif.
+    Mengekspor data numerik profil ufuk ke file Excel (.xlsx) dengan 5 kolom ringkas
+    sesuai tampilan preview (No, Azimut, Elevasi, Data Lokasi, Status Kelayakan).
     """
     import openpyxl
     from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
@@ -522,8 +521,8 @@ def export_excel_data(
     align_right = Alignment(horizontal="right", vertical="center")
     align_left = Alignment(horizontal="left", vertical="center")
 
-    # Title Banner (Row 1)
-    ws.merge_cells("A1:H1")
+    # Title Banner (Row 1) - Merged 5 Columns (A1:E1)
+    ws.merge_cells("A1:E1")
     cell_a1 = ws["A1"]
     cell_a1.value = "TABEL DATA NUMERIK PROFIL UFUK MAR'I BERBASIS COMPUTER VISION"
     cell_a1.font = font_title
@@ -531,9 +530,9 @@ def export_excel_data(
     cell_a1.alignment = align_center
     ws.row_dimensions[1].height = 28
 
-    # Metadata (Rows 2 - 5)
+    # Metadata (Rows 2 - 5) - Merged to Column E
     metadata = [
-        ("Pos Observasi Falak", location_name),
+        ("Data Lokasi / Pos Observasi", location_name),
         ("Azimut Bidikan Utama", f"{az_center:.2f}° (Barat)"),
         ("Kerendahan Ufuk Laut (Dip)", f"-{dip_val:.4f}°"),
         ("Waktu Ekspor Data", f"{time.strftime('%Y-%m-%d %H:%M:%S')} WIB"),
@@ -545,26 +544,23 @@ def export_excel_data(
         c_lbl.fill = fill_meta
         c_lbl.border = thin_border
 
-        ws.merge_cells(start_row=row_idx, start_column=2, end_row=row_idx, end_column=8)
+        ws.merge_cells(start_row=row_idx, start_column=2, end_row=row_idx, end_column=5)
         c_val = ws.cell(row=row_idx, column=2, value=val)
         c_val.font = font_meta_val
         c_val.alignment = align_left
-        for col_i in range(2, 9):
+        for col_i in range(2, 6):
             ws.cell(row=row_idx, column=col_i).border = thin_border
 
     # Row 6 blank
     ws.row_dimensions[6].height = 10
 
-    # Table Headers (Row 7)
+    # Table Headers (Row 7) - 5 Kolom Sesuai Preview
     headers = [
         "No",
-        "Kolom (Pixel X)",
         "Azimut (°)",
-        "Elevasi Halangan (°)",
-        "Elevasi (DMS)",
-        "Selisih Hakiki (Δ0°)",
-        "Selisih Laut (ΔDip)",
-        "Status Kelayakan Rukyat",
+        "Elevasi (°)",
+        "Data Lokasi",
+        "Status Kelayakan",
     ]
     header_row = 7
     ws.row_dimensions[header_row].height = 26
@@ -604,37 +600,23 @@ def export_excel_data(
         c_no = ws.cell(row=current_row, column=1, value=r["no"])
         c_no.alignment = align_center
 
-        # Kolom X
-        c_col = ws.cell(row=current_row, column=2, value=r["col_x"])
-        c_col.alignment = align_center
+        # Azimut (°)
+        c_az = ws.cell(row=current_row, column=2, value=round(r["az"], 2))
+        c_az.alignment = align_center
+        c_az.number_format = '0.00"°"'
 
-        # Azimut
-        c_az = ws.cell(row=current_row, column=3, value=round(r["az"], 4))
-        c_az.alignment = align_right
-        c_az.number_format = '0.0000"°"'
+        # Elevasi (°)
+        c_el = ws.cell(row=current_row, column=3, value=round(r["el"], 2))
+        c_el.alignment = align_center
+        c_el.number_format = '+0.00"°";-0.00"°";0.00"°"'
 
-        # Elevasi
-        c_el = ws.cell(row=current_row, column=4, value=round(r["el"], 4))
-        c_el.alignment = align_right
-        c_el.number_format = '+0.0000"°";-0.0000"°";0.0000"°"'
+        # Data Lokasi
+        c_loc = ws.cell(row=current_row, column=4, value=location_name)
+        c_loc.alignment = align_center
 
-        # DMS
-        c_dms = ws.cell(row=current_row, column=5, value=r["dms"])
-        c_dms.alignment = align_center
-
-        # Selisih Hakiki
-        c_dh = ws.cell(row=current_row, column=6, value=round(r["delta_hakiki"], 4))
-        c_dh.alignment = align_right
-        c_dh.number_format = '+0.0000"°";-0.0000"°";0.0000"°"'
-
-        # Selisih Dip
-        c_dd = ws.cell(row=current_row, column=7, value=round(r["delta_dip"], 4))
-        c_dd.alignment = align_right
-        c_dd.number_format = '+0.0000"°";-0.0000"°";0.0000"°"'
-
-        # Status
+        # Status Kelayakan
         st = r["status"]
-        c_st = ws.cell(row=current_row, column=8, value=st)
+        c_st = ws.cell(row=current_row, column=5, value=st)
         c_st.alignment = align_center
         if st in status_styles:
             c_st.fill, c_st.font = status_styles[st]
@@ -642,7 +624,7 @@ def export_excel_data(
             c_st.font = font_data
             c_st.fill = row_fill
 
-        for col_idx in range(1, 8):
+        for col_idx in range(1, 5):
             cell = ws.cell(row=current_row, column=col_idx)
             cell.font = font_data
             cell.fill = row_fill
@@ -653,8 +635,8 @@ def export_excel_data(
 
     last_data_row = current_row - 1
 
-    # Auto Filter
-    ws.auto_filter.ref = f"A{header_row}:H{last_data_row}"
+    # Auto Filter (A7:E)
+    ws.auto_filter.ref = f"A{header_row}:E{last_data_row}"
 
     # Auto column width
     for col in ws.columns:
