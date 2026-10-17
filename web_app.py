@@ -2028,7 +2028,7 @@ HTML_TEMPLATE = """
           // ==========================================================
           // Menggantikan lingkaran di tengah menjadi pita bar derajat vertikal di sisi kiri layar
           // persis seperti pita kompas horizontal di bagian atas layar.
-          const vBarX = 46 * scale; // Garis baseline vertikal di kiri layar
+          const vBarX = Math.round(112 * scale); // Garis baseline vertikal di kiri layar (memberi ruang untuk label derajat/cm)
           const vBarTop = tapeY + tapeH + (32 * scale); // Di bawah pita kompas atas
           const vBarBot = h - (36 * scale); // Di atas kontrol shutter bawah
           const vBarH = vBarBot - vBarTop;
@@ -2049,60 +2049,78 @@ HTML_TEMPLATE = """
           const startPitch = Math.floor(curTilt - (vFovDeg / 2) - 2);
           const endPitch = Math.ceil(curTilt + (vFovDeg / 2) + 2);
 
+          // Konversi nilai derajat ke sentimeter (cm) dengan rasio presisi 30cm: 1°/0,52cm, 2°/1,04cm, 3°/1,57cm
+          function getElevCmStr(d) {
+            const a = Math.abs(d);
+            if (a === 0) return "0,00";
+            if (Math.abs(a - 1) < 0.05) return "0,52";
+            if (Math.abs(a - 2) < 0.05) return "1,04";
+            if (Math.abs(a - 3) < 0.05) return "1,57";
+            return (a * (1.57 / 3.0)).toFixed(2).replace('.', ',');
+          }
+
           for (let p = startPitch; p <= endPitch; p++) {
             // Dalam fisika optik: sudut positif (menengadah ke langit) berada di atas cy
             const yPos = cy - (p - curTilt) * pxPerDegV;
             if (yPos < vBarTop || yPos > vBarBot) continue;
 
-            if (p === 0) {
-              // 0.0° UFUK MAR'I / LEVEL (WARNA HIJAU EMERALD / EMAS TERANG)
+            const isZero = (p === 0);
+            const isMajor = (p % 10 === 0);
+            const isMedium = (p % 5 === 0);
+            const isSpecial = (Math.abs(p) >= 1 && Math.abs(p) <= 3);
+
+            // Garis penanda skala (Tick Mark)
+            ctx.beginPath();
+            if (isZero) {
               ctx.strokeStyle = isLevel ? "#10b981" : "#38bdf8";
               ctx.lineWidth = 2.5 * scale;
-              ctx.beginPath();
-              ctx.moveTo(vBarX - (22 * scale), yPos);
+              ctx.moveTo(vBarX - (24 * scale), yPos);
               ctx.lineTo(vBarX + (8 * scale), yPos);
-              ctx.stroke();
+            } else if (isMajor) {
+              ctx.strokeStyle = "rgba(226, 232, 240, 0.9)";
+              ctx.lineWidth = 1.5 * scale;
+              ctx.moveTo(vBarX - (18 * scale), yPos);
+              ctx.lineTo(vBarX + (4 * scale), yPos);
+            } else if (isMedium) {
+              ctx.strokeStyle = "rgba(255, 255, 255, 0.75)";
+              ctx.lineWidth = 1.2 * scale;
+              ctx.moveTo(vBarX - (14 * scale), yPos);
+              ctx.lineTo(vBarX + (2 * scale), yPos);
+            } else if (isSpecial) {
+              ctx.strokeStyle = "rgba(255, 255, 255, 0.65)";
+              ctx.lineWidth = 1 * scale;
+              ctx.moveTo(vBarX - (12 * scale), yPos);
+              ctx.lineTo(vBarX, yPos);
+            } else {
+              ctx.strokeStyle = "rgba(255, 255, 255, 0.22)";
+              ctx.lineWidth = 0.8 * scale;
+              ctx.moveTo(vBarX - (5 * scale), yPos);
+              ctx.lineTo(vBarX, yPos);
+            }
+            ctx.stroke();
 
+            // Label teks derajat dan sentimeter (Format: 1°/0,52cm, 2°/1,04cm, 3°/1,57cm, dst)
+            if (isZero) {
               ctx.fillStyle = isLevel ? "#34d399" : "#38bdf8";
-              ctx.font = `bold ${Math.round(11 * scale)}px sans-serif`;
+              ctx.font = `bold ${Math.round(10.5 * scale)}px sans-serif`;
               ctx.textAlign = "right";
               ctx.shadowColor = "rgba(0, 0, 0, 0.9)";
               ctx.shadowBlur = 4;
-              ctx.fillText("0° UFUK", vBarX - (26 * scale), yPos + (4 * scale));
+              ctx.fillText("0°/0,00cm UFUK", vBarX - (28 * scale), yPos + (3.5 * scale));
               ctx.shadowBlur = 0;
-            } else if (p % 10 === 0) {
-              // Garis mayor setiap 10°
-              ctx.strokeStyle = "rgba(226, 232, 240, 0.85)";
-              ctx.lineWidth = 1.4 * scale;
-              ctx.beginPath();
-              ctx.moveTo(vBarX - (16 * scale), yPos);
-              ctx.lineTo(vBarX + (4 * scale), yPos);
-              ctx.stroke();
+            } else if (isMajor || isMedium || isSpecial) {
+              const sign = p > 0 ? "+" : "-";
+              const absP = Math.abs(p);
+              const txt = `${sign}${absP}°/${getElevCmStr(absP)}cm`;
 
-              ctx.fillStyle = "#cbd5e1";
-              ctx.font = `bold ${Math.round(10 * scale)}px monospace`;
+              ctx.fillStyle = isMajor ? "#f8fafc" : (isMedium ? "#cbd5e1" : "#94a3b8");
+              ctx.font = `bold ${Math.round((isMajor ? 10 : (isMedium ? 9 : 8)) * scale)}px monospace`;
               ctx.textAlign = "right";
               ctx.shadowColor = "rgba(0, 0, 0, 0.9)";
               ctx.shadowBlur = 3;
-              const signStr = p > 0 ? `+${p}°` : `${p}°`;
-              ctx.fillText(signStr, vBarX - (18 * scale), yPos + (3.5 * scale));
+              const xOffset = isSpecial && (absP % 2 === 1) ? (16 * scale) : (20 * scale);
+              ctx.fillText(txt, vBarX - xOffset, yPos + (3.5 * scale));
               ctx.shadowBlur = 0;
-            } else if (p % 5 === 0) {
-              // Garis menengah setiap 5°
-              ctx.strokeStyle = "rgba(255, 255, 255, 0.55)";
-              ctx.lineWidth = 1 * scale;
-              ctx.beginPath();
-              ctx.moveTo(vBarX - (10 * scale), yPos);
-              ctx.lineTo(vBarX, yPos);
-              ctx.stroke();
-            } else {
-              // Garis mikro per 1°
-              ctx.strokeStyle = "rgba(255, 255, 255, 0.22)";
-              ctx.lineWidth = 0.8 * scale;
-              ctx.beginPath();
-              ctx.moveTo(vBarX - (5 * scale), yPos);
-              ctx.lineTo(vBarX, yPos);
-              ctx.stroke();
             }
           }
           ctx.restore();
@@ -2122,13 +2140,15 @@ HTML_TEMPLATE = """
 
           // Label Nilai Derajat Kemiringan Vertikal Digital di samping jarum penunjuk
           ctx.fillStyle = isLevel ? "#34d399" : "#ffffff";
-          ctx.font = `bold ${Math.round(12 * scale)}px monospace`;
+          ctx.font = `bold ${Math.round(11.5 * scale)}px monospace`;
           ctx.textAlign = "left";
           ctx.shadowColor = "rgba(0, 0, 0, 0.9)";
           ctx.shadowBlur = 4;
-          const tiltPrefix = curTilt > 0 ? "+" : "";
+          const tiltPrefix = curTilt > 0 ? "+" : (curTilt < 0 ? "-" : "");
+          const absTilt = Math.abs(curTilt);
+          const liveTiltCm = getElevCmStr(absTilt);
           const levelText = isLevel ? "🎯 LEVEL" : (curTilt > 0 ? "▲ LANGIT" : "▼ BUMI");
-          ctx.fillText(`${tiltPrefix}${curTilt.toFixed(1)}° (${levelText})`, vBarX + (17 * scale), cy + (4 * scale));
+          ctx.fillText(`${tiltPrefix}${absTilt.toFixed(1)}°/${liveTiltCm}cm (${levelText})`, vBarX + (17 * scale), cy + (4 * scale));
           ctx.shadowBlur = 0;
           ctx.restore();
 
