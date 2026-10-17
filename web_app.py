@@ -1184,6 +1184,28 @@ HTML_TEMPLATE = """
     let liveCompassMag = 0;
     let liveCompassGyro = 0;
 
+    // Tabel kalibrasi presisi derajat ke sentimeter (cm) sesuai acuan pengukuran optik falak jarak 30cm:
+    // 1°/0,52cm, 2°/1,04cm, 3°/1,57cm, 4°/2,09cm, 5°/2,62cm, 10°/5,28cm, 15°/8,03cm, 20°/10,91cm
+    const CALIB_DEG_CM = {
+      1: "0,52", 2: "1,04", 3: "1,57", 4: "2,09", 5: "2,62",
+      6: "3,15", 7: "3,68", 8: "4,21", 9: "4,75", 10: "5,28",
+      11: "5,83", 12: "6,37", 13: "6,92", 14: "7,47", 15: "8,03",
+      16: "8,60", 17: "9,17", 18: "9,74", 19: "10,32", 20: "10,91"
+    };
+
+    function getElevCmStr(d) {
+      const a = Math.abs(d);
+      if (a < 0.001) return "0,00";
+      const intA = Math.round(a);
+      if (Math.abs(a - intA) < 0.05 && CALIB_DEG_CM[intA]) {
+        return CALIB_DEG_CM[intA];
+      }
+      // Rumus tangen jarak 30 cm: 30 * tan(theta)
+      const cm = 30.0 * Math.tan((a * Math.PI) / 180.0);
+      const floored = Math.floor(cm * 100) / 100;
+      return floored.toFixed(2).replace('.', ',');
+    }
+
     function getCardinalDirection(deg) {
       deg = ((deg % 360) + 360) % 360;
       if (deg >= 337.5 || deg < 22.5) return "UTARA";
@@ -2007,28 +2029,6 @@ HTML_TEMPLATE = """
           // Skala derajat bergerak live mengikuti sudut curTilt
           const startPitch = Math.floor(curTilt - (vFovDeg / 2) - 2);
           const endPitch = Math.ceil(curTilt + (vFovDeg / 2) + 2);
-
-          // Tabel kalibrasi presisi derajat ke sentimeter (cm) sesuai acuan pengukuran optik falak jarak 30cm:
-          // 1°/0,52cm, 2°/1,04cm, 3°/1,57cm, 4°/2,09cm, 5°/2,62cm, 10°/5,28cm, 15°/8,03cm, 20°/10,91cm
-          const CALIB_DEG_CM = {
-            1: "0,52", 2: "1,04", 3: "1,57", 4: "2,09", 5: "2,62",
-            6: "3,15", 7: "3,68", 8: "4,21", 9: "4,75", 10: "5,28",
-            11: "5,83", 12: "6,37", 13: "6,92", 14: "7,47", 15: "8,03",
-            16: "8,60", 17: "9,17", 18: "9,74", 19: "10,32", 20: "10,91"
-          };
-
-          function getElevCmStr(d) {
-            const a = Math.abs(d);
-            if (a === 0) return "0,00";
-            const intA = Math.round(a);
-            if (Math.abs(a - intA) < 0.05 && CALIB_DEG_CM[intA]) {
-              return CALIB_DEG_CM[intA];
-            }
-            // Rumus tangen jarak 30 cm: 30 * tan(theta)
-            const cm = 30.0 * Math.tan((a * Math.PI) / 180.0);
-            const floored = Math.floor(cm * 100) / 100;
-            return floored.toFixed(2).replace('.', ',');
-          }
 
           for (let p = startPitch; p <= endPitch; p++) {
             // Dalam fisika optik: sudut positif (menengadah ke langit) berada di atas cy
