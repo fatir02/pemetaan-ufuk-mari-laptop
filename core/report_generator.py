@@ -342,8 +342,57 @@ def export_pdf_report(
 
     elements.append(Spacer(1, 8))
 
+    # TABEL OBJEK HALANGAN MENONJOL (PROMINENT OBSTACLES)
+    elements.append(Paragraph("IV. DAFTAR OBJEK HALANGAN MENONJOL PADA KONTUR UFUK MAR'I", section_style))
+
+    body_center = ParagraphStyle("DocBodyCenter", parent=body_style, alignment=1)
+    header_style = ParagraphStyle("DocHeaderCenter", parent=body_style, fontName="Helvetica-Bold", alignment=1)
+
+    obs_table_data = [
+        [
+            Paragraph("<b>No.</b>", header_style),
+            Paragraph("<b>Objek</b>", header_style),
+            Paragraph("<b>Azimut</b>", header_style),
+            Paragraph("<b>Sudut Elevasi</b>", header_style),
+        ]
+    ]
+
+    prom_obs = profile_data.get("prominent_obstacles", [])
+    if prom_obs:
+        for obs in prom_obs:
+            obs_id = obs.get("id", len(obs_table_data))
+            obs_label = obs.get("label", f"Objek {obs_id}")
+            az_str = f"{obs.get('azimuth', 0.0):.2f}°".replace(".", ",")
+            alt_val = obs.get("elevation", 0.0)
+            alt_str = f"{alt_val:+.2f}°".replace(".", ",")
+            obs_table_data.append([
+                Paragraph(f"{obs_id}.", body_center),
+                Paragraph(obs_label, body_center),
+                Paragraph(az_str, body_center),
+                Paragraph(alt_str, body_center),
+            ])
+    else:
+        obs_table_data.append([
+            Paragraph("-", body_center),
+            Paragraph("Tidak terdeteksi objek menonjol signifikan", body_center),
+            Paragraph("-", body_center),
+            Paragraph("-", body_center),
+        ])
+
+    t_obs = Table(obs_table_data, colWidths=[45, 165, 150, 160])
+    t_obs.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#f0f0f0")),
+        ("BOX", (0, 0), (-1, -1), 0.8, colors.black),
+        ("INNERGRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#cccccc")),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("TOPPADDING", (0, 0), (-1, -1), 3),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+    ]))
+    elements.append(t_obs)
+    elements.append(Spacer(1, 10))
+
     # BAGIAN CATATAN & REKOMENDASI KELAYAKAN
-    elements.append(Paragraph("IV. REKOMENDASI KELAYAKAN LOKASI RUKYAT & CATATAN LAPANGAN", section_style))
+    elements.append(Paragraph("V. REKOMENDASI KELAYAKAN LOKASI RUKYAT & CATATAN LAPANGAN", section_style))
 
     rec_content = recommendation_text.strip() if recommendation_text.strip() else (
         target_analysis.get("recommendation", "Lokasi memiliki keterbukaan ufuk yang baik.")
