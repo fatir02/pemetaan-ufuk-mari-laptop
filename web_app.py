@@ -1125,7 +1125,7 @@ HTML_TEMPLATE = """
             <tr style="background: #0f172a; color: #38bdf8; border-bottom: 2px solid #233147; position: sticky; top: 0; z-index: 2;">
               <th style="padding: 10px 12px; font-weight: bold; border-right: 1px solid #1e293b; width: 60px; text-align: center;">No</th>
               <th style="padding: 10px 12px; font-weight: bold; border-right: 1px solid #1e293b; text-align: center;">Azimut (°)</th>
-              <th style="padding: 10px 12px; font-weight: bold; border-right: 1px solid #1e293b; text-align: center;">Elevasi (°)</th>
+              <th style="padding: 10px 12px; font-weight: bold; border-right: 1px solid #1e293b; text-align: center;">Elevasi / cm</th>
               <th style="padding: 10px 12px; font-weight: bold; border-right: 1px solid #1e293b; text-align: center;">Data Lokasi</th>
               <th style="padding: 10px 12px; font-weight: bold; text-align: center;">Status Kelayakan</th>
             </tr>
@@ -2683,6 +2683,8 @@ HTML_TEMPLATE = """
         const el = row.el;
         const az = row.az;
         const elStr = (el >= 0 ? "+" : "") + el.toFixed(2) + "°";
+        const cmStr = getElevCmStr(el);
+        const elevDisplay = `${elStr} / ${cmStr} cm`;
 
         let badgeHtml = "";
         if (el <= -dip + 0.05) {
@@ -2699,7 +2701,7 @@ HTML_TEMPLATE = """
         html += `<tr style="background: ${bgCol}; border-bottom: 1px solid #1e293b;">
           <td style="padding: 8px 12px; color: #64748b; font-family: monospace; border-right: 1px solid #1e293b; text-align: center;">${idx + 1}</td>
           <td style="padding: 8px 12px; font-weight: bold; color: #38bdf8; font-family: monospace; border-right: 1px solid #1e293b; text-align: center;">${az.toFixed(2)}°</td>
-          <td style="padding: 8px 12px; font-weight: bold; color: #f8fafc; font-family: monospace; border-right: 1px solid #1e293b; text-align: center;">${elStr}</td>
+          <td style="padding: 8px 12px; font-weight: bold; color: #f8fafc; font-family: monospace; border-right: 1px solid #1e293b; text-align: center;">${elevDisplay}</td>
           <td style="padding: 8px 12px; color: #cbd5e1; font-family: monospace; border-right: 1px solid #1e293b; text-align: center;">${locStr}</td>
           <td style="padding: 8px 12px; text-align: center;">${badgeHtml}</td>
         </tr>`;
@@ -2714,7 +2716,7 @@ HTML_TEMPLATE = """
         alert("Tidak ada data untuk disalin.");
         return;
       }
-      const headerRow = ["No", "Azimut (°)", "Elevasi (°)", "Data Lokasi", "Status Kelayakan"].join("\\t");
+      const headerRow = ["No", "Azimut (°)", "Elevasi / cm", "Data Lokasi", "Status Kelayakan"].join("\\t");
       let tsv = headerRow + "\\n";
       rows.forEach(r => {
         const cells = Array.from(r.querySelectorAll('td')).map(c => c.innerText.trim());

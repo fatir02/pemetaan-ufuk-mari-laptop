@@ -31,6 +31,24 @@ from reportlab.platypus import (
 
 from core.falak_calc import format_dms
 
+CALIB_DEG_CM = {
+    0: "0,00", 1: "0,52", 2: "1,04", 3: "1,57", 4: "2,09",
+    5: "2,62", 6: "3,15", 7: "3,68", 8: "4,21", 9: "4,75",
+    10: "5,28", 11: "5,83", 12: "6,37", 13: "6,92", 14: "7,47",
+    15: "8,03", 16: "8,60", 17: "9,17", 18: "9,74", 19: "10,32", 20: "10,91"
+}
+
+def get_elev_cm_str(deg: float) -> str:
+    a = abs(float(deg))
+    if a < 0.001:
+        return "0,00"
+    int_a = int(round(a))
+    if abs(a - int_a) < 0.05 and int_a in CALIB_DEG_CM:
+        return CALIB_DEG_CM[int_a]
+    val = 30.0 * math.tan(math.radians(a))
+    floored = math.floor(val * 100) / 100.0
+    return f"{floored:.2f}".replace(".", ",")
+
 
 def export_pdf_report(
     output_pdf_path: str,
@@ -317,7 +335,7 @@ def export_pdf_report(
             ],
             [
                 Paragraph("Tinggi Halangan Mar'i (Alt):", body_style),
-                Paragraph(f"<b>{t_alt:+.3f}°</b> ({format_dms(t_alt)})", body_style),
+                Paragraph(f"<b>{t_alt:+.3f}° / {get_elev_cm_str(t_alt)} cm</b> ({format_dms(t_alt)})", body_style),
                 Paragraph("Sudut elevasi kontur terhadap ufuk hakiki (0°)", body_style),
             ],
             [
@@ -353,7 +371,7 @@ def export_pdf_report(
             Paragraph("<b>No.</b>", header_style),
             Paragraph("<b>Objek</b>", header_style),
             Paragraph("<b>Azimut</b>", header_style),
-            Paragraph("<b>Sudut Elevasi</b>", header_style),
+            Paragraph("<b>Sudut Elevasi / cm</b>", header_style),
         ]
     ]
 
@@ -364,12 +382,13 @@ def export_pdf_report(
             obs_label = obs.get("label", f"Objek {obs_id}")
             az_str = f"{obs.get('azimuth', 0.0):.2f}°".replace(".", ",")
             alt_val = obs.get("elevation", 0.0)
-            alt_str = f"{alt_val:+.2f}°".replace(".", ",")
+            cm_val = get_elev_cm_str(alt_val)
+            elev_cm_str = f"{alt_val:+.2f}° / {cm_val} cm".replace(".", ",")
             obs_table_data.append([
                 Paragraph(f"{obs_id}.", body_center),
                 Paragraph(obs_label, body_center),
                 Paragraph(az_str, body_center),
-                Paragraph(alt_str, body_center),
+                Paragraph(elev_cm_str, body_center),
             ])
     else:
         obs_table_data.append([
@@ -541,10 +560,12 @@ def export_csv_data(
         f.write(f"Kerendahan Ufuk Laut Dip,\"-{dip_val:.4f}°\"\n")
         f.write(f"Waktu Ekspor,\"{time.strftime('%Y-%m-%d %H:%M:%S')} WIB\"\n")
         f.write("\n")
-        f.write("No,Azimut (°),Elevasi (°),Data Lokasi,Status Kelayakan\n")
+        f.write("No,Azimut (°),Elevasi / cm,Data Lokasi,Status Kelayakan\n")
         for r in table_rows:
+            cm_str = get_elev_cm_str(r['el'])
+            el_cm = f"{r['el']:+.2f}° / {cm_str} cm"
             f.write(
-                f"{r['no']},{r['az']:.2f},{r['el']:+.2f},\"{safe_loc}\",\"{r['status']}\"\n"
+                f"{r['no']},{r['az']:.2f},\"{el_cm}\",\"{safe_loc}\",\"{r['status']}\"\n"
             )
 
     return output_csv_path
@@ -640,7 +661,7 @@ def export_excel_data(
     headers = [
         "No",
         "Azimut (°)",
-        "Elevasi (°)",
+        "Elevasi / cm",
         "Data Lokasi",
         "Status Kelayakan",
     ]
@@ -687,10 +708,10 @@ def export_excel_data(
         c_az.alignment = align_center
         c_az.number_format = '0.00"°"'
 
-        # Elevasi (°)
-        c_el = ws.cell(row=current_row, column=3, value=round(r["el"], 2))
+        # Elevasi / cm
+        cm_str = get_elev_cm_str(r["el"])
+        c_el = ws.cell(row=current_row, column=3, value=f"{r['el']:+.2f}° / {cm_str} cm")
         c_el.alignment = align_center
-        c_el.number_format = '+0.00"°";-0.00"°";0.00"°"'
 
         # Data Lokasi
         c_loc = ws.cell(row=current_row, column=4, value=location_name)
