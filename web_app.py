@@ -835,7 +835,7 @@ HTML_TEMPLATE = """
             <p style="font-size: 0.74rem; color: #64748b; margin-top: 3px;">Klik 'Buka File', klik area ini, atau Drag & Drop / Paste foto</p>
           </div>
 
-          <img id="rawPreview" class="preview-img" alt="Preview Foto Aktif">
+          <img id="rawPreview" class="preview-img" alt="Preview Foto Aktif" onclick="document.getElementById('galleryInput').click()" style="cursor: pointer;" title="Klik foto untuk mengganti gambar">
 
           <!-- PREVIEW 3 FOTO (SLOT FOTO & PILIHAN FOTO) -->
           <div class="photo-slots-wrapper">
@@ -1360,10 +1360,8 @@ HTML_TEMPLATE = """
           preview.src = activeSlot.b64;
           preview.style.display = 'block';
         }
-        if (dropArea) dropArea.classList.add('active');
-        if (lblStatus) {
-          lblStatus.innerText = `Slot ${activeSlotIndex + 1} Terpilih: ${activeSlot.status || 'Foto Siap Diproses'}`;
-          lblStatus.style.color = '#10b981';
+        if (dropArea) {
+          dropArea.style.display = 'none';
         }
       } else {
         selectedImageBase64 = null;
@@ -1371,7 +1369,10 @@ HTML_TEMPLATE = """
           preview.src = '';
           preview.style.display = 'none';
         }
-        if (dropArea) dropArea.classList.remove('active');
+        if (dropArea) {
+          dropArea.style.display = 'block';
+          dropArea.classList.remove('active');
+        }
         if (lblStatus) {
           lblStatus.innerText = `Slot ${activeSlotIndex + 1} kosong - Silakan pilih / muat foto`;
           lblStatus.style.color = '#38bdf8';
@@ -2752,6 +2753,11 @@ HTML_TEMPLATE = """
       if (document.getElementById('rightPlaceholder')) {
         document.getElementById('rightPlaceholder').style.display = 'block';
       }
+      const dropArea = document.getElementById('dropArea');
+      if (dropArea) {
+        dropArea.style.display = 'block';
+        dropArea.classList.remove('active');
+      }
       document.getElementById('lblPhotoStatus').innerText = "Belum ada foto yang dipilih";
       document.getElementById('lblPhotoStatus').style.color = "#94a3b8";
       resetImgZoom();
@@ -2978,8 +2984,6 @@ HTML_TEMPLATE = """
     document.addEventListener('DOMContentLoaded', function() {
       initInteractiveImage();
       updatePhotoSlotsUI();
-      // Muat foto contoh ke Slot 1 saat awal dibuka
-      loadSamplePhoto();
     });
   </script>
 </body>
@@ -3187,18 +3191,7 @@ def fast_render_plot_image(azimuths, elevations, dip_deg, target_az=None, target
         cv2.line(img, (sx, tm), (sx, tm + ph), (55, 40, 30), 1)
         cv2.putText(img, f'{az_val:.1f}*', (sx - 18, tm + ph + 18), cv2.FONT_HERSHEY_SIMPLEX, 0.33, (184, 163, 148), 1, cv2.LINE_AA)
 
-    _, y_hakiki = to_screen(az_min, 0.0)
-    if tm <= y_hakiki <= tm + ph:
-        for dx in range(lm, lm + pw, 16):
-            cv2.line(img, (dx, y_hakiki), (min(lm + pw, dx + 9), y_hakiki), (248, 189, 56), 1, cv2.LINE_AA)
-        cv2.putText(img, 'Ufuk Hakiki (0.00*)', (lm + 8, max(tm + 12, y_hakiki - 4)), cv2.FONT_HERSHEY_SIMPLEX, 0.33, (248, 189, 56), 1, cv2.LINE_AA)
-
-    if dip_deg > 0:
-        _, y_dip = to_screen(az_min, -dip_deg)
-        if tm <= y_dip <= tm + ph:
-            for dx in range(lm, lm + pw, 10):
-                cv2.line(img, (dx, y_dip), (min(lm + pw, dx + 4), y_dip), (36, 191, 251), 1, cv2.LINE_AA)
-            cv2.putText(img, f'Ufuk Laut Dip (-{dip_deg:.2f}*)', (lm + 8, min(tm + ph - 6, y_dip + 12)), cv2.FONT_HERSHEY_SIMPLEX, 0.33, (36, 191, 251), 1, cv2.LINE_AA)
+    # Garis Ufuk Hakiki dan Ufuk Laut Dip ditiadakan sesuai permintaan
 
     step = max(1, len(azimuths) // pw)
     pts = [to_screen(azimuths[i], elevations[i]) for i in range(0, len(azimuths), step)]

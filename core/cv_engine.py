@@ -514,35 +514,7 @@ class HorizonDetector:
         h, w = image_bgr.shape[:2]
         canvas = image_bgr.copy()
 
-        # 1. Gambar Ufuk Hakiki (0°) jika diminta
-        if show_true_horizon:
-            from core.falak_calc import azimuth_elevation_to_pixel
-            _, y_true = azimuth_elevation_to_pixel(
-                az_center, 0.0, w, h, az_center, hfov, vfov, tilt_center
-            )
-            if 0 <= y_true < h:
-                dash_len = 16
-                for dx in range(0, w, dash_len * 2):
-                    cv2.line(canvas, (dx, y_true), (min(w - 1, dx + dash_len), y_true), (220, 220, 220), 1)
-                cv2.putText(
-                    canvas, "Ufuk Hakiki (0.00 deg)", (15, max(20, y_true - 6)),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.45, (230, 230, 230), 1, cv2.LINE_AA
-                )
-
-            # Garis Dip (Ufuk Mar'i Laut) jika ketinggian > 0
-            if dip_deg > 0:
-                _, y_dip = azimuth_elevation_to_pixel(
-                    az_center, -dip_deg, w, h, az_center, hfov, vfov, tilt_center
-                )
-                if 0 <= y_dip < h:
-                    dash_len = 12
-                    for dx in range(0, w, dash_len * 2):
-                        cv2.line(canvas, (dx, y_dip), (min(w - 1, dx + dash_len), y_dip), (0, 220, 255), 1)
-                    cv2.putText(
-                        canvas, f"Ufuk Laut Dip (-{dip_deg:.2f} deg)", (15, min(h - 10, y_dip + 14)),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 220, 255), 1, cv2.LINE_AA
-                    )
-
+        # 1. Garis Ufuk Hakiki (0°) dan Ufuk Laut Dip ditiadakan sesuai permintaan
         # 2. Gambar Salib Sumbu Tengah Optik (Optical Center Crosshair)
         cx, cy = int((w - 1) / 2), int((h - 1) / 2)
         cv2.line(canvas, (cx - 15, cy), (cx + 15, cy), (120, 120, 120), 1)
