@@ -2049,14 +2049,26 @@ HTML_TEMPLATE = """
           const startPitch = Math.floor(curTilt - (vFovDeg / 2) - 2);
           const endPitch = Math.ceil(curTilt + (vFovDeg / 2) + 2);
 
-          // Konversi nilai derajat ke sentimeter (cm) dengan rasio presisi 30cm: 1°/0,52cm, 2°/1,04cm, 3°/1,57cm
+          // Tabel kalibrasi presisi derajat ke sentimeter (cm) sesuai acuan pengukuran optik falak jarak 30cm:
+          // 1°/0,52cm, 2°/1,04cm, 3°/1,57cm, 4°/2,09cm, 5°/2,62cm, 10°/5,28cm, 15°/8,03cm, 20°/10,91cm
+          const CALIB_DEG_CM = {
+            1: "0,52", 2: "1,04", 3: "1,57", 4: "2,09", 5: "2,62",
+            6: "3,15", 7: "3,68", 8: "4,21", 9: "4,75", 10: "5,28",
+            11: "5,83", 12: "6,37", 13: "6,92", 14: "7,47", 15: "8,03",
+            16: "8,60", 17: "9,17", 18: "9,74", 19: "10,32", 20: "10,91"
+          };
+
           function getElevCmStr(d) {
             const a = Math.abs(d);
             if (a === 0) return "0,00";
-            if (Math.abs(a - 1) < 0.05) return "0,52";
-            if (Math.abs(a - 2) < 0.05) return "1,04";
-            if (Math.abs(a - 3) < 0.05) return "1,57";
-            return (a * (1.57 / 3.0)).toFixed(2).replace('.', ',');
+            const intA = Math.round(a);
+            if (Math.abs(a - intA) < 0.05 && CALIB_DEG_CM[intA]) {
+              return CALIB_DEG_CM[intA];
+            }
+            // Rumus tangen jarak 30 cm: 30 * tan(theta)
+            const cm = 30.0 * Math.tan((a * Math.PI) / 180.0);
+            const floored = Math.floor(cm * 100) / 100;
+            return floored.toFixed(2).replace('.', ',');
           }
 
           for (let p = startPitch; p <= endPitch; p++) {
@@ -2067,7 +2079,6 @@ HTML_TEMPLATE = """
             const isZero = (p === 0);
             const isMajor = (p % 10 === 0);
             const isMedium = (p % 5 === 0);
-            const isSpecial = (Math.abs(p) >= 1 && Math.abs(p) <= 3);
 
             // Garis penanda skala (Tick Mark)
             ctx.beginPath();
@@ -2086,20 +2097,17 @@ HTML_TEMPLATE = """
               ctx.lineWidth = 1.2 * scale;
               ctx.moveTo(vBarX - (14 * scale), yPos);
               ctx.lineTo(vBarX + (2 * scale), yPos);
-            } else if (isSpecial) {
-              ctx.strokeStyle = "rgba(255, 255, 255, 0.65)";
-              ctx.lineWidth = 1 * scale;
-              ctx.moveTo(vBarX - (12 * scale), yPos);
-              ctx.lineTo(vBarX, yPos);
             } else {
-              ctx.strokeStyle = "rgba(255, 255, 255, 0.22)";
+              // Garis mikro per 1° (tanpa teks angka agar tidak berdempetan)
+              ctx.strokeStyle = "rgba(255, 255, 255, 0.25)";
               ctx.lineWidth = 0.8 * scale;
-              ctx.moveTo(vBarX - (5 * scale), yPos);
+              ctx.moveTo(vBarX - (6 * scale), yPos);
               ctx.lineTo(vBarX, yPos);
             }
             ctx.stroke();
 
-            // Label teks derajat dan sentimeter (Format: 1°/0,52cm, 2°/1,04cm, 3°/1,57cm, dst)
+            // Label teks derajat dan sentimeter (Hanya untuk 0° UFUK dan kelipatan 5°: 5°, 10°, 15°, 20°)
+            // Tidak menampilkan teks +1, +2, +3, -1, -2, -3 agar layar bersih
             if (isZero) {
               ctx.fillStyle = isLevel ? "#34d399" : "#38bdf8";
               ctx.font = `bold ${Math.round(10.5 * scale)}px sans-serif`;
@@ -2108,18 +2116,17 @@ HTML_TEMPLATE = """
               ctx.shadowBlur = 4;
               ctx.fillText("0°/0,00cm UFUK", vBarX - (28 * scale), yPos + (3.5 * scale));
               ctx.shadowBlur = 0;
-            } else if (isMajor || isMedium || isSpecial) {
+            } else if (isMajor || isMedium) {
               const sign = p > 0 ? "+" : "-";
               const absP = Math.abs(p);
               const txt = `${sign}${absP}°/${getElevCmStr(absP)}cm`;
 
-              ctx.fillStyle = isMajor ? "#f8fafc" : (isMedium ? "#cbd5e1" : "#94a3b8");
-              ctx.font = `bold ${Math.round((isMajor ? 10 : (isMedium ? 9 : 8)) * scale)}px monospace`;
+              ctx.fillStyle = isMajor ? "#f8fafc" : "#cbd5e1";
+              ctx.font = `bold ${Math.round((isMajor ? 10 : 9) * scale)}px monospace`;
               ctx.textAlign = "right";
               ctx.shadowColor = "rgba(0, 0, 0, 0.9)";
               ctx.shadowBlur = 3;
-              const xOffset = isSpecial && (absP % 2 === 1) ? (16 * scale) : (20 * scale);
-              ctx.fillText(txt, vBarX - xOffset, yPos + (3.5 * scale));
+              ctx.fillText(txt, vBarX - (20 * scale), yPos + (3.5 * scale));
               ctx.shadowBlur = 0;
             }
           }
