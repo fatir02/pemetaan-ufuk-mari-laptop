@@ -248,12 +248,8 @@ HTML_TEMPLATE = """
       align-items: center;
       justify-content: center;
       color: #64748b;
-      font-size: 0.70rem;
-      font-weight: 600;
-      gap: 3px;
-    }
-    .slot-empty-icon {
-      font-size: 1.25rem;
+      font-size: 0.76rem;
+      font-weight: 700;
     }
 
     /* Prominent Objects Pop-up Panel */
@@ -851,7 +847,6 @@ HTML_TEMPLATE = """
               <div class="slot-card active" id="slotCard0" onclick="selectPhotoSlot(0)">
                 <span class="slot-badge-tag" id="slotBadge0">Slot 1</span>
                 <div class="slot-empty-body" id="slotEmpty0">
-                  <span class="slot-empty-icon">📷</span>
                   <span>Slot 1</span>
                 </div>
                 <img id="slotImg0" style="display: none;" alt="Slot 1">
@@ -859,7 +854,6 @@ HTML_TEMPLATE = """
               <div class="slot-card" id="slotCard1" onclick="selectPhotoSlot(1)">
                 <span class="slot-badge-tag" id="slotBadge1">Slot 2</span>
                 <div class="slot-empty-body" id="slotEmpty1">
-                  <span class="slot-empty-icon">📷</span>
                   <span>Slot 2</span>
                 </div>
                 <img id="slotImg1" style="display: none;" alt="Slot 2">
@@ -867,30 +861,10 @@ HTML_TEMPLATE = """
               <div class="slot-card" id="slotCard2" onclick="selectPhotoSlot(2)">
                 <span class="slot-badge-tag" id="slotBadge2">Slot 3</span>
                 <div class="slot-empty-body" id="slotEmpty2">
-                  <span class="slot-empty-icon">📷</span>
                   <span>Slot 3</span>
                 </div>
                 <img id="slotImg2" style="display: none;" alt="Slot 3">
               </div>
-            </div>
-          </div>
-
-          <!-- BAR INFORMASI FOLDER HASIL JEPRETAN -->
-          <div style="margin-top: 12px; padding: 10px 14px; background: rgba(15, 23, 42, 0.95); border: 1px solid #334155; border-radius: 8px; display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap;">
-            <div style="display: flex; align-items: center; gap: 8px;">
-              <span style="font-size: 1.2rem;">📁</span>
-              <div>
-                <span style="font-size: 0.77rem; color: #38bdf8; font-weight: bold; display: block;">Folder Khusus Hasil Jepretan:</span>
-                <span id="lblLastSavedCapture" style="font-size: 0.73rem; color: #94a3b8;">hasil_jepretan/ (Setiap jepret otomatis tersimpan sebagai file .jpg)</span>
-              </div>
-            </div>
-            <div style="display: flex; gap: 6px; flex-wrap: wrap;">
-              <button type="button" class="btn btn-secondary btn-sm" onclick="openCapturesFolder()" style="font-size: 0.74rem; padding: 5px 12px; width: auto; background: #1e293b; border: 1px solid #38bdf8; color: #ffffff;">
-                📂 Buka Folder di Laptop
-              </button>
-              <button type="button" class="btn btn-secondary btn-sm" onclick="importFromSdCard()" title="Cari foto di kartu SD/flashdisk kamera jika pernah jepret offline" style="font-size: 0.74rem; padding: 5px 12px; width: auto; background: #1e293b; border: 1px solid #475569; color: #cbd5e1;">
-                📥 Impor SD Card
-              </button>
             </div>
           </div>
         </div>
