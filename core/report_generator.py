@@ -254,7 +254,37 @@ def export_pdf_report(
         ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
     ]))
     elements.append(t_meta)
-    elements.append(Spacer(1, 6))
+    elements.append(Spacer(1, 4))
+
+    # BAGIAN VISUAL: FOTO OVERLAY & GRAFIK (DIKEMBALIKAN KE BAGIAN II)
+    elements.append(Paragraph("II. CITRA LAPANGAN & GRAFIK PROFIL KONTUR UFUK MAR'I", section_style))
+
+    # Ukuran gambar di laporan sesuai dengan ukuran dan aspek rasio gambar hasil deteksi asli agar tidak gepeng/tertarik
+    orig_h, orig_w = overlay_img_bgr.shape[:2]
+    aspect_img = orig_h / max(1, orig_w)
+
+    w_img = 490.0
+    h_img = round(w_img * aspect_img)
+    max_h_img = 265.0
+    if h_img > max_h_img:
+        h_img = max_h_img
+        w_img = round(h_img / aspect_img)
+
+    w_plot = 490.0
+    h_plot = 175.0
+
+    img_flowable = RLImage(temp_overlay_path, width=w_img, height=h_img)
+    img_flowable.hAlign = "CENTER"
+    elements.append(img_flowable)
+    elements.append(Spacer(1, 4))
+
+    plot_flowable = RLImage(temp_plot_path, width=w_plot, height=h_plot)
+    plot_flowable.hAlign = "CENTER"
+    elements.append(plot_flowable)
+    elements.append(Spacer(1, 4))
+
+    # PINDAH KE HALAMAN 2: TABEL ANALISIS SASARAN, REKOMENDASI & PENGESAHAN
+    elements.append(PageBreak())
 
     # TABEL 2: ANALISIS TITIK BIDIK SASARAN (Misal Azimut Hilal)
     elements.append(Paragraph("III. HASIL ANALISIS SUDUT HALANGAN UFUK PADA TITIK SASARAN", section_style))
@@ -305,14 +335,14 @@ def export_pdf_report(
             ("BOX", (0, 0), (-1, -1), 0.8, colors.black),
             ("INNERGRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#cccccc")),
             ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-            ("TOPPADDING", (0, 0), (-1, -1), 2),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+            ("TOPPADDING", (0, 0), (-1, -1), 2.5),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 2.5),
         ]))
         elements.append(t_analysis)
     else:
         elements.append(Paragraph("<i>Belum ada titik sasaran azimut yang dipilih.</i>", body_style))
 
-    elements.append(Spacer(1, 6))
+    elements.append(Spacer(1, 8))
 
     # BAGIAN CATATAN & REKOMENDASI KELAYAKAN
     elements.append(Paragraph("IV. REKOMENDASI KELAYAKAN LOKASI RUKYAT & CATATAN LAPANGAN", section_style))
@@ -340,21 +370,21 @@ def export_pdf_report(
         ("BOX", (0, 0), (-1, -1), 0.8, colors.black),
         ("INNERGRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#cccccc")),
         ("VALIGN", (0, 0), (-1, -1), "TOP"),
-        ("TOPPADDING", (0, 0), (-1, -1), 2.5),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 2.5),
+        ("TOPPADDING", (0, 0), (-1, -1), 3),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
     ]))
     elements.append(t_rec)
-    elements.append(Spacer(1, 8))
+    elements.append(Spacer(1, 14))
 
-    # TANDA TANGAN PENGESAHAN (Halaman 1)
+    # TANDA TANGAN PENGESAHAN (Halaman 2)
     sig_table_data = [
         [
             Paragraph("Petugas Pengamat / Surveyor Falak,", ParagraphStyle("S1", parent=body_style, alignment=1, textColor=colors.black)),
             Paragraph("Mengetahui / Memvalidasi:<br/>Ketua Laboratorium Falak,", ParagraphStyle("S2", parent=body_style, alignment=1, textColor=colors.black)),
         ],
         [
-            Spacer(1, 24),
-            Spacer(1, 24),
+            Spacer(1, 26),
+            Spacer(1, 26),
         ],
         [
             Paragraph("( ...................................................... )", ParagraphStyle("S3", parent=body_style, alignment=1, textColor=colors.black)),
@@ -367,34 +397,6 @@ def export_pdf_report(
         ("ALIGN", (0, 0), (-1, -1), "CENTER"),
     ]))
     elements.append(KeepTogether(t_sig))
-
-    # HALAMAN 2: LAMPIRAN VISUAL CITRA & GRAFIK PROFIL KONTUR UFUK MAR'I
-    elements.append(PageBreak())
-    elements.append(Paragraph("II. CITRA LAPANGAN & GRAFIK PROFIL KONTUR UFUK MAR'I", section_style))
-
-    # Tampilkan foto overlay dan grafik dengan ukuran dan resolusi proporsional mengikuti citra asli agar tidak gepeng/tertarik
-    orig_h, orig_w = overlay_img_bgr.shape[:2]
-    aspect_img = orig_h / max(1, orig_w)
-
-    w_img = 490.0
-    h_img = round(w_img * aspect_img)
-    max_h_img = 265.0
-    if h_img > max_h_img:
-        h_img = max_h_img
-        w_img = round(h_img / aspect_img)
-
-    w_plot = 490.0
-    h_plot = 200.0
-
-    img_flowable = RLImage(temp_overlay_path, width=w_img, height=h_img)
-    img_flowable.hAlign = "CENTER"
-    elements.append(img_flowable)
-    elements.append(Spacer(1, 6))
-
-    plot_flowable = RLImage(temp_plot_path, width=w_plot, height=h_plot)
-    plot_flowable.hAlign = "CENTER"
-    elements.append(plot_flowable)
-    elements.append(Spacer(1, 4))
 
     # Bangun PDF
     doc.build(elements)
