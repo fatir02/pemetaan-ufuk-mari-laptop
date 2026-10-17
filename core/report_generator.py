@@ -321,16 +321,6 @@ def export_pdf_report(
                 Paragraph("Sudut elevasi kontur terhadap ufuk hakiki (0°)", body_style),
             ],
             [
-                Paragraph("Selisih thd Ufuk Hakiki (0°):", body_style),
-                Paragraph(f"{t_alt:+.3f}°", body_style),
-                Paragraph("Halangan di atas (positif) atau di bawah (negatif)", body_style),
-            ],
-            [
-                Paragraph("Selisih thd Ufuk Laut (-Dip):", body_style),
-                Paragraph(f"{t_alt - (-dip_deg):+.3f}°", body_style),
-                Paragraph(f"Tinggi rintangan relatif terhadap cakrawala air laut (-{dip_deg:.2f}°)", body_style),
-            ],
-            [
                 Paragraph("Status & Klasifikasi Halangan:", body_style),
                 Paragraph(f"<b>{t_status}</b> ({t_sev})", body_style),
                 Paragraph(t_cat, body_style),
