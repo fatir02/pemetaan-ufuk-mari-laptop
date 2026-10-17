@@ -97,7 +97,7 @@ def export_pdf_report(
             bbox=dict(boxstyle="round,pad=0.25", facecolor="#ede7f6", edgecolor="#7b1fa2", alpha=0.9),
         )
 
-    # Skala sumbu X (Azimut 240 s.d 300)
+    # Skala sumbu X (Azimut)
     az_min = float(azimuths[0])
     az_max = float(azimuths[-1])
     ax.set_xlim(az_min, az_max)
@@ -105,12 +105,20 @@ def export_pdf_report(
         x_ticks = [240.0, 250.0, 260.0, 270.0, 280.0, 290.0, 300.0]
     else:
         az_step = 10.0 if (az_max - az_min) >= 30.0 else 5.0
-        x_ticks = list(np.arange(np.ceil(az_min / az_step) * az_step, az_max + 0.1, az_step))
-        if not any(abs(t - az_min) < 1.0 for t in x_ticks):
+        x_ticks = list(np.arange(np.ceil(az_min / az_step) * az_step, az_max, az_step))
+        if not any(abs(t - az_min) < 3.0 for t in x_ticks):
             x_ticks.insert(0, az_min)
-        if not any(abs(t - az_max) < 1.0 for t in x_ticks):
+        if not any(abs(t - az_max) < 3.0 for t in x_ticks):
             x_ticks.append(az_max)
-    x_labels = [f"{x:.0f}° (Barat)" if abs(x - 270.0) < 0.2 else f"{x:.0f}°" for x in x_ticks]
+
+    def format_az_tick_report(val):
+        deg = val % 360.0 if val >= 360.0 else val
+        s = f"{deg:.0f}°"
+        if abs((val % 360.0) - 270.0) < 0.2:
+            s += " (Barat)"
+        return s
+
+    x_labels = [format_az_tick_report(x) for x in x_ticks]
     ax.set_xticks(x_ticks)
     ax.set_xticklabels(x_labels, fontsize=8)
 

@@ -385,6 +385,10 @@ class HorizonDetector:
         azimuths = np.asarray(az_raw, dtype=np.float64)
         elevations = np.asarray(el_raw, dtype=np.float64)
 
+        # Baseline kalibrasi ufuk: tempatkan 0° tepat di garis dasar ufuk mar'i (garis merah)
+        min_el = float(np.min(elevations))
+        elevations = elevations - min_el
+
         dip_deg, dip_arcmin = calculate_dip(elevation_m)
 
         prominent_obstacles = self.detect_prominent_obstacles(
