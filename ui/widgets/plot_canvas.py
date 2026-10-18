@@ -88,22 +88,14 @@ class HorizonPlotCanvas(QWidget):
         self.ax.set_xlim(azimuths[0], azimuths[-1])
         self.ax.set_ylim(min_y, max_y)
 
-        # 1. Garis Ufuk Hakiki (0.00°)
+        # 1. Baseline relatif: titik terendah profil sengaja ditetapkan 0°.
         self.ax.plot(
             [azimuths[0], azimuths[-1]], [0.0, 0.0],
             color="#4fc3f7", linestyle="--", linewidth=1.2,
-            label="Ufuk Hakiki (0.00°)", alpha=0.9
+            label="Baseline Ufuk Relatif (0.00°)", alpha=0.9
         )
 
-        # 2. Garis Kerendahan Ufuk Laut (-Dip)
-        if dip_deg > 0:
-            self.ax.plot(
-                [azimuths[0], azimuths[-1]], [-dip_deg, -dip_deg],
-                color="#ffb74d", linestyle=":", linewidth=1.3,
-                label=f"Ufuk Laut (-{dip_deg:.2f}°)", alpha=0.9
-            )
-
-        # 3. Kurva Profil Ufuk Mar'i
+        # 2. Kurva Profil Ufuk Mar'i relatif terhadap baseline tersebut.
         self.ax.plot(
             azimuths, elevations,
             color="#ff5252", linewidth=2.0,
@@ -112,7 +104,7 @@ class HorizonPlotCanvas(QWidget):
         # Shading bukit/halangan di bawah kontur
         self.ax.fill_between(azimuths, elevations, min_y, color="#ff1744", alpha=0.15, zorder=2)
 
-        # 4. Kursor Azimut Sasaran
+        # 3. Kursor Azimut Sasaran
         if target_az is not None:
             self.ax.plot(
                 [target_az, target_az], [min_y, max_y],
@@ -137,8 +129,8 @@ class HorizonPlotCanvas(QWidget):
         self.ax.set_ylim(min_y, max_y)
 
         self.ax.set_xlabel("Rentang Azimut Bidikan (°)", color="#cfd8dc", fontsize=9, fontweight="bold")
-        self.ax.set_ylabel("Sudut Elevasi (°)", color="#cfd8dc", fontsize=9, fontweight="bold")
-        self.ax.set_title("Profil Elevasi Ufuk Mar'i vs Azimut", color="#ffffff", fontsize=10, fontweight="bold", pad=8)
+        self.ax.set_ylabel("Elevasi Relatif dari Baseline 0°", color="#cfd8dc", fontsize=9, fontweight="bold")
+        self.ax.set_title("Profil Elevasi Relatif Ufuk Mar'i vs Azimut", color="#ffffff", fontsize=10, fontweight="bold", pad=8)
 
         # Tampilan grid dan border
         self.ax.grid(True, linestyle="--", alpha=0.25, color="#78909c")

@@ -153,6 +153,28 @@ python3 main.py
 4. **Penyempurnaan Render Overlay Citra:**
    - Menambahkan resolusi otomatis indeks kolom horizontal `target_x` pada fungsi `render_overlay` untuk sinkronisasi retikel target dan anotasi derajat falak.
 
+5. **Deteksi Detail Menara, Antena, dan Objek di Ujung Citra:**
+
+   - Memisahkan jalur kontur utama yang halus dari jalur detail struktur vertikal agar objek ramping tidak dianggap noise oleh Dynamic Programming.
+
+   - Menggunakan ROI adaptif di atas garis ufuk, toleransi gap untuk menara kisi, validasi kontras lokal, kontinuitas vertikal, aspect ratio, dan confidence score.
+
+   - Menambahkan deteksi satu sisi pada batas aktif kiri/kanan sehingga objek yang berada tepat di ujung foto tetap dapat dilaporkan.
+
+   - Titik terendah profil tetap sengaja ditetapkan sebagai baseline relatif `0°`; elevasi objek menyatakan tinggi sudut di atas baseline tersebut.
+
+6. **Klasifikasi Otomatis Halangan Skyline:**
+
+   - Kandidat yang bersinggungan dengan garis ufuk diberi label awal konservatif: `Menara/Antena`, `Vegetasi/Pohon`, `Bangunan/Atap`, `Bukit/Terrain`, atau `Halangan Ufuk` jika bukti visual belum cukup kuat.
+
+   - Klasifikasi menggabungkan geometri kontur, aspect ratio, warna vegetasi, tekstur, kepadatan tepi, dan metadata struktur vertikal. Confidence digunakan secara internal dan nama tetap dapat dikoreksi manual oleh pengamat.
+
+   - Pada aplikasi desktop PyQt, editor nama tersedia di Layar Hasil pada kartu **OBJEK HALANGAN SKYLINE**. Perubahan nama langsung memperbarui overlay dan ikut diteruskan ke laporan PDF.
+
+   - Gambar kontur pada sisi kiri Layar Hasil dapat diklik untuk membuka viewer fullscreen. Gunakan roda mouse atau cubit trackpad untuk zoom, drag atau gestur dua jari untuk menggeser gambar, klik dua kali untuk memperbesar titik yang diklik, tombol **Sesuaikan Layar** untuk reset, dan `Esc` untuk menutup.
+
+   - Rentang azimut pada kartu objek dapat diklik untuk membuka viewer fullscreen yang langsung diperbesar dan dipusatkan pada objek terkait.
+
 ### B. `web_app.py` (Pembaruan Antarmuka Web Interaktif)
 1. **Viewport Citra Interaktif dengan Zoom & Pan:**
    - Menambahkan kontrol perbesaran citra interaktif (tombol `🔍 +`, `🔍 -`, `↺ 100%`, roda mouse/scroll, serta gestur *pinch-to-zoom* 2 jari pada perangkat sentuh).

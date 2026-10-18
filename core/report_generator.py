@@ -153,8 +153,8 @@ def export_pdf_report(
     ax.set_yticklabels(y_labels, fontsize=8)
 
     ax.set_xlabel("Rentang Azimut Bidikan (°)", fontsize=9, fontweight="bold", color="#000000")
-    ax.set_ylabel("Sudut Elevasi / Skala Falak (° / cm)", fontsize=9, fontweight="bold", color="#000000")
-    ax.set_title("Grafik Elevasi vs Azimut", fontsize=10, fontweight="bold", color="#000000", pad=6)
+    ax.set_ylabel("Elevasi Relatif / Skala Falak (° / cm)", fontsize=9, fontweight="bold", color="#000000")
+    ax.set_title("Grafik Elevasi Relatif vs Azimut", fontsize=10, fontweight="bold", color="#000000", pad=6)
     ax.grid(True, linestyle="--", alpha=0.5, color="#bdbdbd")
     plt.tight_layout()
     fig.savefig(temp_plot_path, dpi=220)
@@ -285,6 +285,12 @@ def export_pdf_report(
 
     # BAGIAN VISUAL: FOTO OVERLAY & GRAFIK (DIKEMBALIKAN KE BAGIAN II)
     elements.append(Paragraph("II. CITRA & GRAFIK ", section_style))
+    elements.append(Paragraph(
+        "<b>Referensi elevasi:</b> titik terendah profil ufuk ditetapkan sebagai 0°. "
+        "Elevasi objek menyatakan tinggi sudut relatif di atas baseline tersebut.",
+        body_style,
+    ))
+    elements.append(Spacer(1, 4))
 
     # Ukuran gambar di laporan sesuai dengan ukuran dan aspek rasio gambar hasil deteksi asli agar tidak gepeng/tertarik
     orig_h, orig_w = overlay_img_bgr.shape[:2]

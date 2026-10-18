@@ -31,6 +31,10 @@ from core.sample_generator import generate_synthetic_horizon
 from core.compass_service import compass_service
 
 app = Flask(__name__)
+# Batasi payload mentah untuk mencegah foto tak sengaja berukuran ekstrem.
+# Klien resmi mengirim maksimum 2560 px, tetapi API tetap menerima gambar dari
+# integrasi lain sampai batas yang aman ini.
+app.config["MAX_CONTENT_LENGTH"] = 40 * 1024 * 1024
 detector = HorizonDetector()
 compass_service.start()
 
@@ -984,7 +988,7 @@ HTML_TEMPLATE = """
             </div>
             <div class="pf-item">
               <span class="pf-icon">2</span>
-              <div><b>Grafik Elevasi vs Azimut</b><p>Pemetaan sudut elevasi rintangan dalam skala derajat dan sentimeter falak</p></div>
+              <div><b>Grafik Elevasi Relatif vs Azimut</b><p>Titik terendah profil ufuk ditetapkan sebagai baseline 0°</p></div>
             </div>
             <div class="pf-item">
               <span class="pf-icon">3</span>
@@ -1462,12 +1466,13 @@ HTML_TEMPLATE = """
         const dataUrl = e.target.result;
         setPhotoToSlot(targetSlot, dataUrl, statusText);
 
-        // Kompresi latar belakang jika resolusi foto sangat besar (misal 12-48 MP kamera HP)
+        // Pertahankan detail menara/antena kecil. Dimensi 1280 px sebelumnya
+        // dapat mengecilkan struktur jauh menjadi hanya 1 px lalu hilang oleh JPEG.
         const img = new Image();
         img.onload = function() {
           let w = img.width;
           let h = img.height;
-          const maxDim = 1280;
+          const maxDim = 2560;
           if (w > maxDim || h > maxDim) {
             if (w > h) {
               h = Math.round((h * maxDim) / w);
@@ -1481,7 +1486,7 @@ HTML_TEMPLATE = """
             canvas.height = h;
             const ctx = canvas.getContext('2d');
             ctx.drawImage(img, 0, 0, w, h);
-            const compressed = canvas.toDataURL('image/jpeg', 0.86);
+            const compressed = canvas.toDataURL('image/jpeg', 0.94);
             if (photoSlots[targetSlot]) {
               photoSlots[targetSlot].b64 = compressed;
               if (activeSlotIndex === targetSlot) {
@@ -3591,8 +3596,8 @@ def fast_render_plot_image(azimuths, elevations, dip_deg, target_az=None, target
     ax.set_yticklabels(y_labels, fontsize=8, color="#f8fafc")
 
     ax.set_xlabel("Rentang Azimut Bidikan (°)", fontsize=8.5, fontweight="bold", color="#94a3b8")
-    ax.set_ylabel("Sudut Elevasi / Skala Falak (° / cm)", fontsize=8.5, fontweight="bold", color="#94a3b8")
-    ax.set_title("Grafik Elevasi vs Azimut", fontsize=9.5, fontweight="bold", color="#38bdf8", pad=6)
+    ax.set_ylabel("Elevasi Relatif / Skala Falak (° / cm)", fontsize=8.5, fontweight="bold", color="#94a3b8")
+    ax.set_title("Grafik Elevasi Relatif vs Azimut", fontsize=9.5, fontweight="bold", color="#38bdf8", pad=6)
     ax.grid(True, linestyle="--", alpha=0.4, color="#334155")
     ax.legend(loc="upper right", fontsize=7.5, framealpha=0.85)
 
@@ -3625,6 +3630,17 @@ def api_analyze():
         return jsonify({"error": "Format gambar tidak didukung"}), 400
 
     h, w = image_bgr.shape[:2]
+    # Guard backend untuk input API non-UI. Pertahankan detail sebanyak mungkin
+    # (maksimum 4096 px), jauh di atas batas lama 1280 px.
+    max_backend_dim = 4096
+    if max(h, w) > max_backend_dim or (h * w) > 20_000_000:
+        scale = min(max_backend_dim / float(max(h, w)), math.sqrt(20_000_000 / float(h * w)))
+        image_bgr = cv2.resize(
+            image_bgr,
+            (max(1, int(round(w * scale))), max(1, int(round(h * scale)))),
+            interpolation=cv2.INTER_AREA,
+        )
+        h, w = image_bgr.shape[:2]
     hfov_val = float(data.get("hfov", 60.0))
     if hfov_val <= 0:
         hfov_val = 60.0
