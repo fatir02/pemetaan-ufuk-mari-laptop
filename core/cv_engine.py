@@ -443,11 +443,15 @@ class HorizonDetector:
         img_w: int,
         img_h: int,
         min_prominence: float = 0.10,
-        max_peaks: int = 5,
+        max_peaks: Optional[int] = None,
     ) -> List[Dict[str, Any]]:
         """
         Mendeteksi objek-objek rintangan yang menonjol di atas garis ufuk mar'i
         (misal menara pemancar, puncak bukit, gedung, atau pohon tinggi).
+
+        Jumlah objek terdeteksi murni dinamis (0, 1, 2, dst) sesuai dengan
+        banyaknya objek yang benar-benar menonjol dalam citra, tidak dipaksakan
+        harus ada 5 objek.
 
         Mengembalikan daftar objek dengan koordinat piksel (x, y) serta
         sudut astronomis:
@@ -459,8 +463,6 @@ class HorizonDetector:
 
         min_dist = max(15, img_w // 28)
         peaks, props = find_peaks(elevations, prominence=min_prominence, distance=min_dist)
-        if len(peaks) == 0 and min_prominence > 0.05:
-            peaks, props = find_peaks(elevations, prominence=0.05, distance=min_dist)
 
         if len(peaks) == 0:
             return []
@@ -468,8 +470,13 @@ class HorizonDetector:
         proms = props.get("prominences", np.zeros(len(peaks)))
         left_bases = props.get("left_bases", peaks)
         right_bases = props.get("right_bases", peaks)
-        top_indices = np.argsort(proms)[::-1][:max_peaks]
-        top_peaks = sorted(peaks[top_indices])
+
+        # Jika max_peaks ditentukan secara eksplisit, batasi; jika None, deteksi semua objek riil
+        if max_peaks is not None and max_peaks > 0 and len(peaks) > max_peaks:
+            top_indices = np.argsort(proms)[::-1][:max_peaks]
+            top_peaks = sorted(peaks[top_indices])
+        else:
+            top_peaks = sorted(peaks)
 
         n = len(elevations)
         obstacles = []
