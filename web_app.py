@@ -3877,26 +3877,23 @@ def _generate_current_pdf_path(location_name=None, observer_name=None, observer_
     # Terapkan nama objek manual sebelum dokumen dibuat
     _apply_object_labels(renamed_objects)
 
-    # Render ulang overlay agar label objek terbaru tampil di gambar laporan
-    if renamed_objects:
-        try:
-            overlay_bgr = detector.render_overlay(
-                image_bgr=LAST_ANALYSIS["image_bgr"],
-                horizon_y=LAST_ANALYSIS["horizon_y"],
-                azimuths=LAST_ANALYSIS["profile_data"]["azimuths"],
-                elevations=LAST_ANALYSIS["profile_data"]["elevations"],
-                target_az=ta.get("target_az"),
-                dip_deg=LAST_ANALYSIS["profile_data"]["dip_deg"],
-                az_center=LAST_ANALYSIS["azimuth"],
-                hfov=hfov_val,
-                vfov=vfov_val,
-                tilt_center=LAST_ANALYSIS["tilt"],
-                prominent_obstacles=LAST_ANALYSIS["profile_data"].get("prominent_obstacles", []),
-                show_prominent_peaks=True,
-            )
-            LAST_ANALYSIS["overlay_bgr"] = overlay_bgr
-        except Exception:
-            pass
+    # Render overlay khusus laporan: TANPA garis merah meridian sasaran
+    # agar dokumentasi citra di dalam laporan PDF bersih dan rapi
+    report_overlay_bgr = detector.render_overlay(
+        image_bgr=LAST_ANALYSIS["image_bgr"],
+        horizon_y=LAST_ANALYSIS["horizon_y"],
+        azimuths=LAST_ANALYSIS["profile_data"]["azimuths"],
+        elevations=LAST_ANALYSIS["profile_data"]["elevations"],
+        target_az=ta.get("target_az"),
+        dip_deg=LAST_ANALYSIS["profile_data"]["dip_deg"],
+        az_center=LAST_ANALYSIS["azimuth"],
+        hfov=hfov_val,
+        vfov=vfov_val,
+        tilt_center=LAST_ANALYSIS["tilt"],
+        prominent_obstacles=LAST_ANALYSIS["profile_data"].get("prominent_obstacles", []),
+        show_prominent_peaks=True,
+        show_target_meridian=False,
+    )
 
     export_pdf_report(
         output_pdf_path=pdf_path,
@@ -3910,7 +3907,7 @@ def _generate_current_pdf_path(location_name=None, observer_name=None, observer_
         tilt_center=LAST_ANALYSIS["tilt"],
         dip_deg=LAST_ANALYSIS["profile_data"]["dip_deg"],
         profile_data=LAST_ANALYSIS["profile_data"],
-        overlay_img_bgr=LAST_ANALYSIS["overlay_bgr"],
+        overlay_img_bgr=report_overlay_bgr,
         target_analysis=ta,
         observer_notes=desc,
         recommendation_text=rec,

@@ -557,6 +557,7 @@ class HorizonDetector:
         tilt_center: float = 0.0,
         prominent_obstacles: Optional[List[Dict[str, Any]]] = None,
         show_prominent_peaks: bool = True,
+        show_target_meridian: bool = True,
     ) -> np.ndarray:
         """
         Merender kontur ufuk mar'i dan garis referensi astronomi pada gambar.
@@ -620,8 +621,8 @@ class HorizonDetector:
                 placed_boxes.append((tx_box, box_top, box_w, box_h))
                 target_info = (tx_box, ty_box, box_top, box_w, box_h, txt)
 
-        # 2. Gambar garis meridian merah dan retikel bidik
-        if target_x is not None and 0 <= target_x < w:
+        # 2. Gambar garis meridian merah dan retikel bidik (hanya jika diaktifkan)
+        if show_target_meridian and target_x is not None and 0 <= target_x < w:
             raw_ty = horizon_y[target_x] if target_y is None else target_y
             ty = int(round(raw_ty))
             cv2.line(canvas, (target_x, 0), (target_x, h - 1), (0, 0, 255), 2, cv2.LINE_AA)
@@ -729,7 +730,7 @@ class HorizonDetector:
                 )
 
         # 4. Gambar kotak teks kursor target di layer paling atas
-        if target_x is not None and 0 <= target_x < w and target_info is not None:
+        if show_target_meridian and target_x is not None and 0 <= target_x < w and target_info is not None:
             tx_box, ty_box, box_top, box_w, box_h, txt = target_info
             cv2.rectangle(canvas, (tx_box, box_top), (tx_box + box_w, box_top + box_h), (20, 20, 25), -1)
             cv2.rectangle(canvas, (tx_box, box_top), (tx_box + box_w, box_top + box_h), (0, 50, 255), 1, cv2.LINE_AA)

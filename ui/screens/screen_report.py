@@ -291,6 +291,27 @@ class ScreenReport(QWidget):
         pdf_path = os.path.join(exports_dir, f"Laporan_Ufuk_{int(time.time())}.pdf")
 
         try:
+            overlay_to_use = self.data_package["overlay_image"]
+            if "horizon_y" in self.data_package and "profile_data" in self.data_package and "image_bgr" in self.data_package:
+                try:
+                    from core.cv_engine import HorizonDetector
+                    det = HorizonDetector()
+                    overlay_to_use = det.render_overlay(
+                        image_bgr=self.data_package["image_bgr"],
+                        horizon_y=self.data_package["horizon_y"],
+                        azimuths=self.data_package["profile_data"]["azimuths"],
+                        elevations=self.data_package["profile_data"]["elevations"],
+                        target_az=self.data_package["azimuth"],
+                        dip_deg=self.data_package["profile_data"].get("dip_deg", 0.197),
+                        az_center=self.data_package["azimuth"],
+                        hfov=15.0,
+                        vfov=8.5,
+                        tilt_center=self.data_package["elevation"],
+                        show_target_meridian=False,
+                    )
+                except Exception:
+                    pass
+
             export_pdf_report(
                 output_pdf_path=pdf_path,
                 location_name=self.edit_location.text().strip() or "Pos Observasi Falak",
@@ -303,7 +324,7 @@ class ScreenReport(QWidget):
                 tilt_center=self.data_package["elevation"],
                 dip_deg=self.data_package["profile_data"].get("dip_deg", 0.197),
                 profile_data=self.data_package["profile_data"],
-                overlay_img_bgr=self.data_package["overlay_image"],
+                overlay_img_bgr=overlay_to_use,
                 target_analysis=self.data_package.get("target_analysis"),
                 observer_notes=self.text_desc.toPlainText().strip(),
                 recommendation_text=self.text_rec.toPlainText().strip(),
