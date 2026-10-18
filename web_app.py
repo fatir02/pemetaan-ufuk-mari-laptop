@@ -61,6 +61,9 @@ HTML_TEMPLATE = """
       flex-direction: column;
       gap: 12px;
       text-align: center;
+      position: sticky;
+      top: 0;
+      z-index: 100;
     }
     .header-brand {
       display: flex;
@@ -317,6 +320,34 @@ HTML_TEMPLATE = """
       font-weight: 700;
       font-size: 0.68rem;
     }
+    .chip-name-input {
+      background: #0b1220;
+      border: 1px solid #334155;
+      border-radius: 5px;
+      color: #ffffff;
+      font-size: 0.76rem;
+      font-weight: 600;
+      padding: 3px 7px;
+      width: 120px;
+      outline: none;
+      font-family: inherit;
+    }
+    .chip-name-input:focus {
+      border-color: #38bdf8;
+      box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.18);
+    }
+    .chip-aim {
+      background: #0284c7;
+      border: none;
+      border-radius: 5px;
+      color: #ffffff;
+      font-size: 0.68rem;
+      font-weight: 700;
+      padding: 4px 8px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .chip-aim:hover { background: #0369a1; }
     .chip-angles {
       font-family: monospace;
       font-size: 0.78rem;
@@ -568,6 +599,7 @@ HTML_TEMPLATE = """
       background-color: rgba(5, 8, 14, 0.96);
       z-index: 9999;
       flex-direction: column;
+      overflow: hidden;
     }
     .preview-doc-header {
       background: linear-gradient(135deg, #0f172a, #1e293b);
@@ -578,6 +610,9 @@ HTML_TEMPLATE = """
       justify-content: space-between;
       gap: 10px;
       flex-wrap: wrap;
+      flex: 0 0 auto;
+      position: relative;
+      z-index: 30;
     }
     .preview-doc-header h2 {
       font-size: 0.92rem;
@@ -602,26 +637,42 @@ HTML_TEMPLATE = """
       cursor: pointer;
     }
     .doc-btn:hover { background-color: #334155; color: #38bdf8; }
+    .doc-zoombar {
+      background: #111726;
+      padding: 8px 16px;
+      border-bottom: 1px solid #1e293b;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex: 0 0 auto;
+      position: relative;
+      z-index: 29;
+    }
     .doc-viewport {
-      flex: 1;
+      flex: 1 1 auto;
       overflow: auto;
       padding: 16px 10px;
       text-align: center;
       background-color: #070a10;
-      touch-action: pan-x pan-y pinch-zoom;
+      touch-action: pan-x pan-y;
       -webkit-overflow-scrolling: touch;
+      min-height: 0;
+      position: relative;
+      z-index: 1;
     }
+    /* Lebar halaman dikendalikan oleh zoom (bukan transform),
+       sehingga bilah alat di atas tetap terlihat dan scrollbar ikut menyesuaikan. */
     .doc-container {
-      display: inline-block;
-      transition: transform 0.1s ease-out;
-      transform-origin: top center;
+      display: block;
+      width: 650px;
+      margin: 0 auto;
     }
     .doc-page {
       background-color: #ffffff;
       border-radius: 4px;
       box-shadow: 0 6px 24px rgba(0, 0, 0, 0.7);
       margin: 0 auto 20px auto;
-      max-width: 100%;
+      width: 100%;
       overflow: hidden;
     }
     .doc-page img {
@@ -889,12 +940,12 @@ HTML_TEMPLATE = """
           <div class="grid-3">
             <div class="form-group">
               <label>Lintang / Lat (°):</label>
-              <input type="number" id="inpLat" value="-7.9800" step="0.0001" placeholder="-7.9800">
+              <input type="text" inputmode="decimal" id="inpLat" value="-7.9800" placeholder="-7.9800" oninput="this.value = this.value.replace(',', '.')">
               <span style="font-size: 0.68rem; color: #64748b;">LS: minus (-), LU: plus (+)</span>
             </div>
             <div class="form-group">
               <label>Bujur / Lon (°):</label>
-              <input type="number" id="inpLon" value="110.3061" step="0.0001" placeholder="110.3061">
+              <input type="text" inputmode="decimal" id="inpLon" value="110.3061" placeholder="110.3061" oninput="this.value = this.value.replace(',', '.')">
               <span style="font-size: 0.68rem; color: #64748b;">BT: plus (+), BB: minus (-)</span>
             </div>
             <div class="form-group">
@@ -975,9 +1026,15 @@ HTML_TEMPLATE = """
             <div id="prominentObjectsContainer" class="prominent-objects-panel" style="display: none;">
               <div class="prominent-objects-header">
                 <span class="prominent-title">Objek Terdeteksi:</span>
-                <span class="prominent-sub">Pilih objek untuk membidik</span>
+                <span class="prominent-sub">Ubah nama objek sesuai pengamatan, lalu klik Terapkan</span>
               </div>
               <div id="prominentObjectsList" class="prominent-objects-list"></div>
+              <div style="margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+                <button type="button" class="btn btn-primary btn-sm" style="width: auto;" onclick="applyObjectNames()">
+                  Terapkan Nama ke Gambar
+                </button>
+                <span id="lblRenameStatus" style="font-size: 0.74rem; color: #94a3b8;"></span>
+              </div>
             </div>
           </div>
 
@@ -1009,6 +1066,17 @@ HTML_TEMPLATE = """
           <div class="card" id="evalCard" style="border: 1px solid #0284c7;">
             <div class="card-title" style="border-bottom: 1px solid #233147; padding-bottom: 8px;">
               <span>Evaluasi & Penerbitan Laporan</span>
+            </div>
+
+            <div class="grid-2">
+              <div class="form-group">
+                <label>Judul Laporan / Berita Acara:</label>
+                <input type="text" id="editReportTitle" value="BERITA ACARA & LAPORAN PEMETAAN PROFIL UFUK MAR'I">
+              </div>
+              <div class="form-group">
+                <label>Nama Instansi / Laboratorium:</label>
+                <input type="text" id="editInstansi" value="FAKULTAS SYARIAH - LABORATORIUM ASTRONOMI & ILMU FALAK">
+              </div>
             </div>
 
             <div class="grid-2">
@@ -1126,9 +1194,9 @@ HTML_TEMPLATE = """
       </div>
     </div>
 
-    <div style="background: #111726; padding: 8px 16px; border-bottom: 1px solid #1e293b; display: flex; align-items: center; gap: 12px;">
+    <div class="doc-zoombar">
       <span style="font-size: 0.78rem; color: #94a3b8; white-space: nowrap;">Perbesaran:</span>
-      <input type="range" id="zoomSlider" min="50" max="250" value="100" step="5" oninput="setZoomScale(this.value / 100.0)">
+      <input type="range" id="zoomSlider" min="40" max="280" value="100" step="5" oninput="setZoomScale(this.value / 100.0)">
     </div>
 
     <div class="doc-viewport" id="docViewport">
@@ -1465,6 +1533,10 @@ HTML_TEMPLATE = """
     }
 
     // Render pop up chips objek menonjol (angka derajat horizontal dan vertikal)
+    // Setiap chip memiliki kolom input nama objek yang bisa diubah manual oleh pengguna.
+    let prominentObjectNames = {};
+    let autoApplyTimer = null;
+
     function renderProminentObjects(objects) {
       const container = document.getElementById('prominentObjectsContainer');
       const list = document.getElementById('prominentObjectsList');
@@ -1478,21 +1550,138 @@ HTML_TEMPLATE = """
 
       container.style.display = 'block';
       list.innerHTML = '';
-      objects.forEach(obj => {
-        const chip = document.createElement('button');
-        chip.type = 'button';
+      window.__prominentObjectsData = objects;
+
+      objects.forEach((obj, idx) => {
+        const key = String(idx + 1);
+        const savedName = prominentObjectNames[key];
+        const displayName = savedName || obj.label || `Objek ${idx + 1}`;
+
+        const chip = document.createElement('div');
         chip.className = 'prominent-chip';
         chip.dataset.az = obj.azimuth.toFixed(2);
-        chip.title = `Bidik langsung ${obj.label}: Azimut ${obj.azimuth.toFixed(2)}°, Elevasi ${obj.elevation >= 0 ? '+' : ''}${obj.elevation.toFixed(2)}°`;
-        chip.innerHTML = `
-          <span class="chip-badge">${obj.label}</span>
-          <span class="chip-angles">H (Az): <b>${obj.azimuth.toFixed(2)}°</b> | V (Alt): <b>${(obj.elevation >= 0 ? '+' : '') + obj.elevation.toFixed(2)}°</b></span>
-        `;
-        chip.onclick = function() {
+        chip.dataset.idx = key;
+
+        const badge = document.createElement('span');
+        badge.className = 'chip-badge';
+        badge.textContent = `#${idx + 1}`;
+
+        const nameInput = document.createElement('input');
+        nameInput.type = 'text';
+        nameInput.className = 'chip-name-input';
+        nameInput.value = displayName;
+        nameInput.placeholder = `Nama objek ${idx + 1}`;
+        nameInput.title = 'Ketik nama objek sesuai pengamatan lapangan';
+        nameInput.onclick = (e) => e.stopPropagation();
+        nameInput.oninput = function() {
+          const val = this.value;
+          prominentObjectNames[key] = val;
+          // Sinkronkan label pada data objek aktif agar ikut terbawa ke gambar & PDF
+          const arr = window.__prominentObjectsData || [];
+          if (arr[idx]) arr[idx].label = val.trim() || `Objek ${idx + 1}`;
+          // Terapkan otomatis ke gambar setelah pengguna berhenti mengetik
+          scheduleAutoApply();
+        };
+        nameInput.onkeydown = function(e) {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            this.blur();
+            applyObjectNames();
+          }
+        };
+        nameInput.onblur = function() {
+          scheduleAutoApply(120);
+        };
+
+        const angles = document.createElement('span');
+        angles.className = 'chip-angles';
+        const azStart = (typeof obj.az_start === 'number') ? obj.az_start : obj.azimuth;
+        const azEnd = (typeof obj.az_end === 'number') ? obj.az_end : obj.azimuth;
+        const hasSpan = (typeof obj.az_span === 'number') && obj.az_span > 0.05;
+        const azText = hasSpan
+          ? `${azStart.toFixed(2)}° – ${azEnd.toFixed(2)}°`
+          : `${obj.azimuth.toFixed(2)}°`;
+        angles.innerHTML = `H (Az): <b>${azText}</b> | V (Alt): <b>${(obj.elevation >= 0 ? '+' : '') + obj.elevation.toFixed(2)}°</b>`;
+
+        const aimBtn = document.createElement('button');
+        aimBtn.type = 'button';
+        aimBtn.className = 'chip-aim';
+        aimBtn.textContent = 'Bidik';
+        aimBtn.onclick = (e) => {
+          e.stopPropagation();
           jumpToAzimuth(obj.azimuth);
         };
+
+        chip.appendChild(badge);
+        chip.appendChild(nameInput);
+        chip.appendChild(angles);
+        chip.appendChild(aimBtn);
         list.appendChild(chip);
       });
+    }
+
+    // Terapkan nama otomatis (debounce) agar gambar langsung berubah saat mengetik
+    function scheduleAutoApply(delay) {
+      if (autoApplyTimer) clearTimeout(autoApplyTimer);
+      autoApplyTimer = setTimeout(() => {
+        autoApplyTimer = null;
+        applyObjectNames(true);
+      }, typeof delay === 'number' ? delay : 650);
+    }
+
+    function getRenamedProminentObjects() {
+      // Sumber kebenaran utama: nilai yang sedang tampil di kotak input.
+      // Ini mencegah nama hilang saat panel di-render ulang oleh server.
+      const inputs = document.querySelectorAll('#prominentObjectsList .chip-name-input');
+      const arr = window.__prominentObjectsData || [];
+      const out = [];
+      const count = Math.max(inputs.length, arr.length);
+      for (let i = 0; i < count; i++) {
+        const base = arr[i] ? { ...arr[i] } : { id: i + 1 };
+        let label = '';
+        if (inputs[i]) {
+          label = String(inputs[i].value || '').trim();
+        }
+        if (!label) {
+          label = String(prominentObjectNames[String(i + 1)] || base.label || '').trim();
+        }
+        base.label = label || `Objek ${i + 1}`;
+        out.push(base);
+      }
+      return out;
+    }
+
+    async function applyObjectNames(silent) {
+      const status = document.getElementById('lblRenameStatus');
+      const objs = getRenamedProminentObjects();
+      if (!objs.length) {
+        if (status && !silent) { status.style.color = '#f87171'; status.textContent = 'Belum ada objek terdeteksi.'; }
+        return;
+      }
+      if (status && !silent) { status.style.color = '#94a3b8'; status.textContent = 'Menerapkan nama...'; }
+      try {
+        const res = await fetch('/api/rename_objects', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ objects: objs })
+        });
+        const data = await res.json();
+        if (data.error) throw new Error(data.error);
+
+        const img = document.getElementById('resOverlayImg');
+        if (img && data.overlay_base64) img.src = data.overlay_base64;
+        if (data.prominent_objects) {
+          // Simpan label baru tanpa menghapus isi input yang sedang diketik
+          window.__prominentObjectsData = data.prominent_objects;
+        }
+        if (status && !silent) {
+          status.style.color = '#34d399';
+          status.textContent = 'Nama objek berhasil diterapkan ke gambar & laporan.';
+          setTimeout(() => { if (status) status.textContent = ''; }, 3500);
+        }
+      } catch (err) {
+        if (status) { status.style.color = '#f87171'; status.textContent = 'Gagal: ' + err.message; }
+      }
     }
 
     function jumpToAzimuth(azVal) {
@@ -1570,14 +1759,29 @@ HTML_TEMPLATE = """
       try {
         const devices = await navigator.mediaDevices.enumerateDevices();
         const videoDevices = devices.filter(d => d.kind === 'videoinput');
-        if (videoDevices.length === 0) return;
+        if (videoDevices.length === 0) {
+          sel.innerHTML = '<option value="">Kamera tidak ditemukan</option>';
+          return;
+        }
+
+        // Jika label & deviceId kosong, artinya izin kamera belum diberikan.
+        // Tampilkan opsi generik agar pengguna tetap bisa memilih.
+        const noPermission = videoDevices.every(d => !d.deviceId || !d.label);
 
         sel.innerHTML = "";
         let autoPickIdx = -1;
 
         videoDevices.forEach((dev, idx) => {
           const opt = document.createElement('option');
-          opt.value = dev.deviceId;
+          opt.value = dev.deviceId || "";
+
+          if (noPermission) {
+            opt.text = `Kamera ${idx + 1} (klik untuk mengaktifkan izin)`;
+            sel.appendChild(opt);
+            if (autoPickIdx === -1) autoPickIdx = idx;
+            return;
+          }
+
           let label = dev.label || `Kamera ${idx + 1}`;
 
           const isGeneral = /general-a-video|general|1b3f|genplus/i.test(label);
@@ -1611,7 +1815,7 @@ HTML_TEMPLATE = """
         });
 
         // Otomatis prioritaskan Digicam/USB eksternal jika pengguna belum memilih kamera tertentu
-        if (!currentCameraDeviceId && autoPickIdx !== -1) {
+        if (!currentCameraDeviceId && autoPickIdx !== -1 && !noPermission) {
           sel.selectedIndex = autoPickIdx;
           currentCameraDeviceId = videoDevices[autoPickIdx].deviceId;
         }
@@ -1652,19 +1856,29 @@ HTML_TEMPLATE = """
 
       try {
         let targetId = preferredDeviceId || currentCameraDeviceId;
-        if (!targetId && navigator.mediaDevices && navigator.mediaDevices.enumerateDevices) {
+
+        // Jika deviceId kosong (izin belum diberikan), minta izin dulu lewat getUserMedia sederhana
+        if (!targetId) {
           try {
-            const devices = await navigator.mediaDevices.enumerateDevices();
-            const videoDevices = devices.filter(d => d.kind === 'videoinput');
-            const extCam = videoDevices.find(d => 
-              /general|genplus|1b3f|logi|c270|c920|c922|brio|teleskop|eyepiece|usb/i.test(d.label) &&
-              !/1bcf:28c4|integrated|built-in/i.test(d.label)
-            );
-            if (extCam && extCam.deviceId) {
-              targetId = extCam.deviceId;
-              currentCameraDeviceId = targetId;
-            }
-          } catch (e) {}
+            const probe = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+            probe.getTracks().forEach(tk => tk.stop());
+          } catch (permErr) {
+            console.warn("Izin kamera belum diberikan:", permErr);
+          }
+          if (navigator.mediaDevices && navigator.mediaDevices.enumerateDevices) {
+            try {
+              const devices = await navigator.mediaDevices.enumerateDevices();
+              const videoDevices = devices.filter(d => d.kind === 'videoinput' && d.deviceId);
+              const extCam = videoDevices.find(d =>
+                /general|genplus|1b3f|logi|c270|c920|c922|brio|teleskop|eyepiece|usb/i.test(d.label) &&
+                !/1bcf:28c4|integrated|built-in/i.test(d.label)
+              );
+              if (extCam && extCam.deviceId) {
+                targetId = extCam.deviceId;
+                currentCameraDeviceId = targetId;
+              }
+            } catch (e) {}
+          }
         }
 
         let constraints;
@@ -2292,8 +2506,8 @@ HTML_TEMPLATE = """
         azimuth: parseFloat(document.getElementById('inpAzimuth').value) || 270.0,
         tilt: parseFloat(document.getElementById('inpTilt').value) || 0.0,
         hfov: parseFloat(document.getElementById('inpHfov')?.value) || 60.0,
-        latitude: parseFloat(document.getElementById('inpLat').value) || -7.98,
-        longitude: parseFloat(document.getElementById('inpLon').value) || 110.306,
+        latitude: parseFloat(String(document.getElementById('inpLat').value).replace(',', '.')) || -7.98,
+        longitude: parseFloat(String(document.getElementById('inpLon').value).replace(',', '.')) || 110.306,
         altitude: parseFloat(document.getElementById('inpAlt')?.value) || 45.0
       };
 
@@ -2311,6 +2525,10 @@ HTML_TEMPLATE = """
           alert("Gagal memproses gambar: " + data.error);
           return;
         }
+
+        // Analisis baru: bersihkan nama objek dari citra sebelumnya
+        prominentObjectNames = {};
+        window.__prominentObjectsData = null;
 
         currentProfileData = data;
         clientProfileCurve = {
@@ -2467,10 +2685,13 @@ HTML_TEMPLATE = """
       container.innerHTML = "<p style='color: #38bdf8; padding: 40px;'>Memuat dokumen PDF...</p>";
 
       const payload = {
+        report_title: (document.getElementById('editReportTitle')?.value || '').trim() || "BERITA ACARA & LAPORAN PEMETAAN PROFIL UFUK MAR'I",
+        instansi_name: (document.getElementById('editInstansi')?.value || '').trim() || "FAKULTAS SYARIAH - LABORATORIUM ASTRONOMI & ILMU FALAK",
         location_name: document.getElementById('editLocation').value.trim() || "Pos Observasi Falak Lapangan",
         observer_name: document.getElementById('editObserver').value.trim() || "Tim Falak & Astronomi",
         observer_notes: document.getElementById('textDesc').value.trim(),
-        recommendation_text: document.getElementById('textRec').value.trim()
+        recommendation_text: document.getElementById('textRec').value.trim(),
+        objects: getRenamedProminentObjects()
       };
 
       fetch('/api/preview_pdf', {
@@ -2499,6 +2720,8 @@ HTML_TEMPLATE = """
         });
 
         resetZoom();
+        const vp = document.getElementById('docViewport');
+        if (vp) { vp.scrollTop = 0; vp.scrollLeft = 0; }
       })
       .catch(err => {
         container.innerHTML = `<p style="color: #ef4444; padding: 40px;">Koneksi gagal: ${err.message}</p>`;
@@ -2509,10 +2732,35 @@ HTML_TEMPLATE = """
       document.getElementById('reportPreviewModal').style.display = 'none';
     }
 
+    const DOC_BASE_WIDTH = 650;
+
     function setZoomScale(scale) {
       currentZoom = Math.max(0.4, Math.min(2.8, scale));
       const container = document.getElementById('docContainer');
-      container.style.transform = `scale(${currentZoom})`;
+      const viewport = document.getElementById('docViewport');
+
+      // Zoom mengubah LEBAR halaman (bukan transform), sehingga bilah alat
+      // di atas tidak ikut ter-zoom maupun terdorong keluar layar.
+      if (container) container.style.width = Math.round(DOC_BASE_WIDTH * currentZoom) + 'px';
+
+      // Pertahankan fokus pandangan di tengah saat perbesaran berubah
+      if (viewport) {
+        const ratioX = viewport.scrollWidth > viewport.clientWidth
+          ? (viewport.scrollLeft + viewport.clientWidth / 2) / viewport.scrollWidth
+          : 0.5;
+        const ratioY = viewport.scrollHeight > viewport.clientHeight
+          ? (viewport.scrollTop + viewport.clientHeight / 2) / viewport.scrollHeight
+          : 0;
+        requestAnimationFrame(() => {
+          if (viewport.scrollWidth > viewport.clientWidth) {
+            viewport.scrollLeft = ratioX * viewport.scrollWidth - viewport.clientWidth / 2;
+          }
+          if (viewport.scrollHeight > viewport.clientHeight) {
+            viewport.scrollTop = ratioY * viewport.scrollHeight - viewport.clientHeight / 2;
+          }
+        });
+      }
+
       document.getElementById('lblZoomLevel').innerText = Math.round(currentZoom * 100) + "%";
       document.getElementById('zoomSlider').value = Math.round(currentZoom * 100);
     }
@@ -2528,7 +2776,7 @@ HTML_TEMPLATE = """
     function fitWidthZoom() {
       const viewport = document.getElementById('docViewport');
       const vw = viewport.clientWidth - 32;
-      const scale = Math.max(0.4, Math.min(2.0, vw / 650.0));
+      const scale = Math.max(0.4, Math.min(2.0, vw / DOC_BASE_WIDTH));
       setZoomScale(scale);
     }
 
@@ -2565,10 +2813,89 @@ HTML_TEMPLATE = """
       }
     }, { passive: true });
 
-    function downloadCurrentPdf() {
+    // ------------------------------------------------------------------
+    // PINCH ZOOM TOUCHPAD (Ctrl + scroll / cubit dua jari)
+    // Hanya KERTAS dokumen yang diperbesar. Bilah alat di atas tidak ikut.
+    // Tanpa ini, browser melakukan zoom halaman penuh sehingga navbar
+    // ikut membesar dan terdorong keluar layar.
+    // ------------------------------------------------------------------
+    function isPreviewOpen() {
+      const m = document.getElementById('reportPreviewModal');
+      return !!m && m.style.display === 'flex';
+    }
+
+    function applyPinchZoom(factor) {
+      setZoomScale(currentZoom * factor);
+    }
+
+    docView.addEventListener('wheel', function(e) {
+      // Ctrl+wheel = gestur pinch pada touchpad (dan Ctrl+scroll manual)
+      if (!e.ctrlKey) return;
+      e.preventDefault();
+      e.stopPropagation();
+      // deltaY negatif = cubit membuka = perbesar
+      const factor = Math.exp(-e.deltaY * 0.0022);
+      applyPinchZoom(factor);
+    }, { passive: false });
+
+    // Cubit di mana pun dalam modal preview (termasuk di atas bilah alat)
+    // tetap hanya memperbesar kertas, bukan seluruh halaman.
+    const previewModalEl = document.getElementById('reportPreviewModal');
+    if (previewModalEl) {
+      previewModalEl.addEventListener('wheel', function(e) {
+        if (!e.ctrlKey) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const factor = Math.exp(-e.deltaY * 0.0022);
+        applyPinchZoom(factor);
+      }, { passive: false });
+    }
+
+    // Kunci zoom halaman browser selama preview terbuka
+    document.addEventListener('wheel', function(e) {
+      if (e.ctrlKey && isPreviewOpen()) {
+        e.preventDefault();
+      }
+    }, { passive: false });
+
+    // Safari / macOS trackpad: event gesture khusus
+    let gestureStartZoom = 1.0;
+    docView.addEventListener('gesturestart', function(e) {
+      e.preventDefault();
+      gestureStartZoom = currentZoom;
+    });
+    docView.addEventListener('gesturechange', function(e) {
+      e.preventDefault();
+      if (e.scale && gestureStartZoom) setZoomScale(gestureStartZoom * e.scale);
+    });
+    docView.addEventListener('gestureend', function(e) {
+      e.preventDefault();
+      gestureStartZoom = currentZoom;
+    });
+
+    // Pintasan papan tombol saat preview terbuka: Ctrl + / Ctrl - / Ctrl 0
+    document.addEventListener('keydown', function(e) {
+      if (!isPreviewOpen() || !e.ctrlKey) return;
+      if (e.key === '+' || e.key === '=') {
+        e.preventDefault();
+        stepZoom(0.2);
+      } else if (e.key === '-' || e.key === '_') {
+        e.preventDefault();
+        stepZoom(-0.2);
+      } else if (e.key === '0') {
+        e.preventDefault();
+        resetZoom();
+      }
+    });
+
+    async function downloadCurrentPdf() {
+      // Pastikan nama objek terbaru tersimpan di server sebelum PDF dibuat
+      try { await applyObjectNames(); } catch (e) {}
       const loc = encodeURIComponent(document.getElementById('editLocation').value.trim() || "Pos Observasi");
       const obs = encodeURIComponent(document.getElementById('editObserver')?.value.trim() || "Tim Falak & Astronomi");
-      window.open('/api/download_pdf?loc=' + loc + '&obs=' + obs, '_blank');
+      const title = encodeURIComponent((document.getElementById('editReportTitle')?.value || '').trim());
+      const inst = encodeURIComponent((document.getElementById('editInstansi')?.value || '').trim());
+      window.open('/api/download_pdf?loc=' + loc + '&obs=' + obs + '&title=' + title + '&inst=' + inst, '_blank');
     }
 
     function downloadExcel() {
@@ -2646,8 +2973,8 @@ HTML_TEMPLATE = """
 
       document.getElementById('tblSampleCount').innerText = selectedRows.length + " Titik Data";
 
-      const latVal = parseFloat(document.getElementById('inpLat')?.value) || -7.98;
-      const lonVal = parseFloat(document.getElementById('inpLon')?.value) || 110.3061;
+      const latVal = parseFloat(String(document.getElementById('inpLat')?.value).replace(',', '.')) || -7.98;
+      const lonVal = parseFloat(String(document.getElementById('inpLon')?.value).replace(',', '.')) || 110.3061;
       const altVal = parseFloat(document.getElementById('inpAlt')?.value) || 45;
       const locStr = (clientProfileCurve && clientProfileCurve.location_str)
         ? clientProfileCurve.location_str
@@ -3012,16 +3339,24 @@ HTML_TEMPLATE = """
 """
 
 
+_cached_camera_check = {"time": 0, "result": None}
+
 @app.route("/api/check_cameras", methods=["GET"])
 def api_check_cameras():
+    global _cached_camera_check
+    now = time.time()
+    if _cached_camera_check["result"] and (now - _cached_camera_check["time"] < 3.0):
+        return jsonify(_cached_camera_check["result"])
+
     result = {
         "cameras": [],
         "digicam_state": "not_detected",
         "message": ""
     }
     try:
+        no_win = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
         cmd = ["wmic", "path", "Win32_PnPEntity", "where", "DeviceID like \"%1B3F%\" and Status=\"OK\"", "get", "Caption,DeviceID", "/format:csv"]
-        r = subprocess.run(cmd, capture_output=True, text=True, timeout=3)
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=3, creationflags=no_win)
         out = r.stdout
         if "PID_2005" in out or "GENERAL-A-VIDEO" in out:
             result["digicam_state"] = "ready"
@@ -3031,7 +3366,7 @@ def api_check_cameras():
             result["message"] = "Kamera saku terdeteksi dalam mode Penyimpanan Massal."
 
         cmd_cam = ["wmic", "path", "Win32_PnPEntity", "where", "PNPClass=\"Camera\" and Status=\"OK\"", "get", "Caption,DeviceID", "/format:csv"]
-        r_cam = subprocess.run(cmd_cam, capture_output=True, text=True, timeout=3)
+        r_cam = subprocess.run(cmd_cam, capture_output=True, text=True, timeout=3, creationflags=no_win)
         for line in r_cam.stdout.splitlines():
             line = line.strip()
             if not line or line.startswith("Node,") or line.startswith("Caption,"):
@@ -3043,6 +3378,8 @@ def api_check_cameras():
                 result["cameras"].append({"caption": caption, "device_id": dev_id})
     except Exception as e:
         result["error"] = str(e)
+
+    _cached_camera_check = {"time": now, "result": result}
     return jsonify(result)
 
 
@@ -3384,6 +3721,65 @@ def api_analyze():
     })
 
 
+@app.route("/api/rename_objects", methods=["POST"])
+def api_rename_objects():
+    """Terapkan nama objek manual ke overlay gambar & data laporan (PDF/Excel)."""
+    global LAST_ANALYSIS
+    try:
+        if not LAST_ANALYSIS:
+            return jsonify({"error": "Belum ada data analisis aktif"}), 400
+
+        data = request.get_json(force=True) or {}
+        renamed = data.get("objects") or []
+        if not isinstance(renamed, list) or not renamed:
+            return jsonify({"error": "Daftar objek tidak valid"}), 400
+
+        profile_data = LAST_ANALYSIS["profile_data"]
+        obstacles = profile_data.get("prominent_obstacles", []) or []
+
+        # Petakan berdasarkan indeks; label diambil dari input pengguna
+        for i, obs in enumerate(obstacles):
+            if i < len(renamed):
+                new_label = str(renamed[i].get("label", "")).strip()
+                if new_label:
+                    obs["label"] = new_label
+                    az_s = obs.get("az_start")
+                    az_e = obs.get("az_end")
+                    if isinstance(az_s, (int, float)) and isinstance(az_e, (int, float)) and abs(float(az_e) - float(az_s)) > 0.05:
+                        az_txt = f"{float(az_s):.2f}-{float(az_e):.2f} deg"
+                    else:
+                        az_txt = f"{obs['azimuth']:.2f} deg"
+                    obs["text"] = f"{new_label}: Az {az_txt} | Alt {obs['elevation']:+.2f} deg"
+
+        # Render ulang overlay dengan nama objek terbaru
+        overlay_bgr = detector.render_overlay(
+            image_bgr=LAST_ANALYSIS["image_bgr"],
+            horizon_y=LAST_ANALYSIS["horizon_y"],
+            azimuths=LAST_ANALYSIS["profile_data"]["azimuths"],
+            elevations=LAST_ANALYSIS["profile_data"]["elevations"],
+            target_az=LAST_ANALYSIS["target_analysis"].get("target_az"),
+            dip_deg=profile_data["dip_deg"],
+            az_center=LAST_ANALYSIS["azimuth"],
+            hfov=LAST_ANALYSIS["hfov"],
+            vfov=LAST_ANALYSIS["vfov"],
+            tilt_center=LAST_ANALYSIS["tilt"],
+            prominent_obstacles=obstacles,
+            show_prominent_peaks=True,
+        )
+        LAST_ANALYSIS["overlay_bgr"] = overlay_bgr
+
+        _, ov_buf = cv2.imencode(".jpg", overlay_bgr, [int(cv2.IMWRITE_JPEG_QUALITY), 82])
+        overlay_b64 = "data:image/jpeg;base64," + base64.b64encode(ov_buf).decode("utf-8")
+
+        return jsonify({
+            "success": True,
+            "overlay_base64": overlay_b64,
+            "prominent_objects": obstacles,
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+
 @app.route("/api/recalculate_target", methods=["POST"])
 def api_recalculate_target():
     global LAST_ANALYSIS
@@ -3437,7 +3833,28 @@ def api_recalculate_target():
     })
 
 
-def _generate_current_pdf_path(location_name=None, observer_name=None, observer_notes=None, recommendation_text=None) -> str:
+def _apply_object_labels(renamed_objects) -> None:
+    """Terapkan nama objek manual dari klien ke data analisis aktif (dipakai PDF/Excel)."""
+    global LAST_ANALYSIS
+    if not LAST_ANALYSIS or not renamed_objects:
+        return
+    profile_data = LAST_ANALYSIS.get("profile_data") or {}
+    obstacles = profile_data.get("prominent_obstacles") or []
+    for i, obs in enumerate(obstacles):
+        if i < len(renamed_objects):
+            new_label = str((renamed_objects[i] or {}).get("label", "")).strip()
+            if new_label:
+                obs["label"] = new_label
+                az_s = obs.get("az_start")
+                az_e = obs.get("az_end")
+                if isinstance(az_s, (int, float)) and isinstance(az_e, (int, float)) and abs(float(az_e) - float(az_s)) > 0.05:
+                    az_txt = f"{float(az_s):.2f}-{float(az_e):.2f} deg"
+                else:
+                    az_txt = f"{obs.get('azimuth', 0.0):.2f} deg"
+                obs["text"] = f"{new_label}: Az {az_txt} | Alt {obs.get('elevation', 0.0):+.2f} deg"
+
+
+def _generate_current_pdf_path(location_name=None, observer_name=None, observer_notes=None, recommendation_text=None, report_title=None, instansi_name=None, renamed_objects=None) -> str:
     global LAST_ANALYSIS
     if not LAST_ANALYSIS:
         raise ValueError("Belum ada data analisis aktif")
@@ -3451,9 +3868,35 @@ def _generate_current_pdf_path(location_name=None, observer_name=None, observer_
     rec = recommendation_text or ta.get("recommendation", "Lokasi rukyatul hilal tervalidasi.")
     loc = location_name or "Pos Observasi Falak Lapangan"
     obs = observer_name or "Tim Falak & Astronomi"
+    rep_title = report_title or "BERITA ACARA & LAPORAN PEMETAAN PROFIL UFUK MAR'I"
+    inst_name = instansi_name or "FAKULTAS SYARIAH - LABORATORIUM ASTRONOMI & ILMU FALAK"
 
     hfov_val = float(LAST_ANALYSIS.get("hfov", 60.0))
     vfov_val = float(LAST_ANALYSIS.get("vfov", 36.0))
+
+    # Terapkan nama objek manual sebelum dokumen dibuat
+    _apply_object_labels(renamed_objects)
+
+    # Render ulang overlay agar label objek terbaru tampil di gambar laporan
+    if renamed_objects:
+        try:
+            overlay_bgr = detector.render_overlay(
+                image_bgr=LAST_ANALYSIS["image_bgr"],
+                horizon_y=LAST_ANALYSIS["horizon_y"],
+                azimuths=LAST_ANALYSIS["profile_data"]["azimuths"],
+                elevations=LAST_ANALYSIS["profile_data"]["elevations"],
+                target_az=ta.get("target_az"),
+                dip_deg=LAST_ANALYSIS["profile_data"]["dip_deg"],
+                az_center=LAST_ANALYSIS["azimuth"],
+                hfov=hfov_val,
+                vfov=vfov_val,
+                tilt_center=LAST_ANALYSIS["tilt"],
+                prominent_obstacles=LAST_ANALYSIS["profile_data"].get("prominent_obstacles", []),
+                show_prominent_peaks=True,
+            )
+            LAST_ANALYSIS["overlay_bgr"] = overlay_bgr
+        except Exception:
+            pass
 
     export_pdf_report(
         output_pdf_path=pdf_path,
@@ -3471,7 +3914,9 @@ def _generate_current_pdf_path(location_name=None, observer_name=None, observer_
         target_analysis=ta,
         observer_notes=desc,
         recommendation_text=rec,
+        instansi_name=inst_name,
         observer_name=obs,
+        report_title=rep_title,
     )
     return pdf_path
 
@@ -3484,8 +3929,19 @@ def api_preview_pdf():
         obs = data.get("observer_name") or request.args.get("obs")
         notes = data.get("observer_notes")
         rec = data.get("recommendation_text")
+        rep_title = data.get("report_title") or request.args.get("title")
+        inst_name = data.get("instansi_name") or request.args.get("inst")
+        renamed_objs = data.get("objects")
 
-        pdf_path = _generate_current_pdf_path(location_name=loc, observer_name=obs, observer_notes=notes, recommendation_text=rec)
+        pdf_path = _generate_current_pdf_path(
+            location_name=loc,
+            observer_name=obs,
+            observer_notes=notes,
+            recommendation_text=rec,
+            report_title=rep_title,
+            instansi_name=inst_name,
+            renamed_objects=renamed_objs,
+        )
         pdf = pypdfium2.PdfDocument(pdf_path)
         pages_b64 = []
         for i in range(len(pdf)):
@@ -3508,7 +3964,14 @@ def api_download_pdf():
     try:
         loc = request.args.get("loc")
         obs = request.args.get("obs")
-        pdf_path = _generate_current_pdf_path(location_name=loc, observer_name=obs)
+        rep_title = request.args.get("title")
+        inst_name = request.args.get("inst")
+        pdf_path = _generate_current_pdf_path(
+            location_name=loc,
+            observer_name=obs,
+            report_title=rep_title,
+            instansi_name=inst_name,
+        )
         return send_file(pdf_path, as_attachment=True, download_name="Laporan_Ufuk_Mar'i.pdf")
     except Exception as e:
         return f"Gagal membuat PDF: {str(e)}", 400

@@ -11,7 +11,6 @@ import math
 from typing import Dict, Any, Optional
 import numpy as np
 import cv2
-import matplotlib.pyplot as plt
 
 from reportlab.lib.pagesizes import letter, A4
 from reportlab.lib import colors
@@ -68,6 +67,8 @@ def export_pdf_report(
     recommendation_text: str = "",
     instansi_name: str = "FAKULTAS SYARIAH - LABORATORIUM ASTRONOMI & ILMU FALAK",
     observer_name: str = "",
+    report_title: str = "BERITA ACARA & LAPORAN PEMETAAN PROFIL UFUK MAR'I",
+    sub_title: str = "Instrumen Falak Digital Berbasis Computer Vision & Analisis Kelayakan Tempat Rukyat",
 ) -> str:
     """
     Menghasilkan dokumen laporan pemetaan ufuk mar'i dalam format PDF.
@@ -88,6 +89,12 @@ def export_pdf_report(
     cv2.imwrite(temp_overlay_path, overlay_img_bgr)
 
     # Render grafik profil ufuk khusus untuk laporan PDF (resolusi tajam 220 DPI)
+    # matplotlib dimuat LAZY (hanya saat laporan benar-benar dibuat) agar
+    # waktu start aplikasi tidak membayar beban impor matplotlib.
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
     azimuths = profile_data["azimuths"]
     elevations = profile_data["elevations"]
 
@@ -225,10 +232,17 @@ def export_pdf_report(
     elements = []
 
     # HEADER KOP RESMI
-    elements.append(Paragraph(instansi_name.upper(), title_style))
-    elements.append(Spacer(1, 2))
-    elements.append(Paragraph("BERITA ACARA & LAPORAN PEMETAAN PROFIL UFUK MAR'I", ParagraphStyle("H2", parent=title_style, fontSize=12, leading=14, textColor=colors.black)))
-    elements.append(Paragraph("Instrumen Falak Digital Berbasis Computer Vision & Analisis Kelayakan Tempat Rukyat", subtitle_style))
+    inst_str = (instansi_name or "").strip().upper()
+    title_str = (report_title or "BERITA ACARA & LAPORAN PEMETAAN PROFIL UFUK MAR'I").strip().upper()
+    sub_str = (sub_title or "").strip()
+
+    if inst_str:
+        elements.append(Paragraph(inst_str, title_style))
+        elements.append(Spacer(1, 2))
+    if title_str:
+        elements.append(Paragraph(title_str, ParagraphStyle("H2", parent=title_style, fontSize=12, leading=14, textColor=colors.black)))
+    if sub_str:
+        elements.append(Paragraph(sub_str, subtitle_style))
     elements.append(Spacer(1, 4))
     elements.append(HRFlowable(width="100%", thickness=1.5, color=colors.black, spaceBefore=1, spaceAfter=8))
 
@@ -329,7 +343,12 @@ def export_pdf_report(
         for obs in prom_obs:
             obs_id = obs.get("id", len(obs_table_data))
             obs_label = obs.get("label", f"Objek {obs_id}")
-            az_str = f"{obs.get('azimuth', 0.0):.2f}°".replace(".", ",")
+            az_start_v = obs.get("az_start")
+            az_end_v = obs.get("az_end")
+            if isinstance(az_start_v, (int, float)) and isinstance(az_end_v, (int, float)) and abs(float(az_end_v) - float(az_start_v)) > 0.05:
+                az_str = f"{float(az_start_v):.2f}° – {float(az_end_v):.2f}°".replace(".", ",")
+            else:
+                az_str = f"{obs.get('azimuth', 0.0):.2f}°".replace(".", ",")
             alt_val = obs.get("elevation", 0.0)
             cm_val = get_elev_cm_str(alt_val)
             elev_cm_str = f"{alt_val:+.2f}° / {cm_val} cm".replace(".", ",")

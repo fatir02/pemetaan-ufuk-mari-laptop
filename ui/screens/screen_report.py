@@ -86,6 +86,28 @@ class ScreenReport(QWidget):
         form_l = QVBoxLayout(form_card)
         form_l.setSpacing(10)
 
+        # Baris 0: Judul Laporan & Nama Instansi
+        r0 = QHBoxLayout()
+        r0.setSpacing(16)
+
+        c0_title = QVBoxLayout()
+        c0_title.setSpacing(3)
+        c0_title.addWidget(QLabel("Judul Laporan / Berita Acara:"))
+        self.edit_report_title = QLineEdit("BERITA ACARA & LAPORAN PEMETAAN PROFIL UFUK MAR'I")
+        self.edit_report_title.setStyleSheet(self._input_style())
+        c0_title.addWidget(self.edit_report_title)
+        r0.addLayout(c0_title)
+
+        c0_inst = QVBoxLayout()
+        c0_inst.setSpacing(3)
+        c0_inst.addWidget(QLabel("Nama Instansi / Laboratorium:"))
+        self.edit_instansi = QLineEdit("FAKULTAS SYARIAH - LABORATORIUM ASTRONOMI & ILMU FALAK")
+        self.edit_instansi.setStyleSheet(self._input_style())
+        c0_inst.addWidget(self.edit_instansi)
+        r0.addLayout(c0_inst)
+
+        form_l.addLayout(r0)
+
         # Baris 1: Nama Lokasi & Petugas
         r1 = QHBoxLayout()
         r1.setSpacing(16)
@@ -285,6 +307,8 @@ class ScreenReport(QWidget):
                 target_analysis=self.data_package.get("target_analysis"),
                 observer_notes=self.text_desc.toPlainText().strip(),
                 recommendation_text=self.text_rec.toPlainText().strip(),
+                instansi_name=self.edit_instansi.text().strip() or "FAKULTAS SYARIAH - LABORATORIUM ASTRONOMI & ILMU FALAK",
+                report_title=self.edit_report_title.text().strip() or "BERITA ACARA & LAPORAN PEMETAAN PROFIL UFUK MAR'I",
             )
             # Picu transisi ke Menu Preview Laporan
             self.proceed_to_preview.emit(pdf_path, self.data_package)

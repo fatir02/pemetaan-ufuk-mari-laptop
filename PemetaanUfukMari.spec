@@ -3,7 +3,7 @@
 import os
 import sys
 
-project_dir = r"D:\pemetaan-ufuk-mari-Laptop"
+project_dir = os.path.abspath(SPECPATH) if "SPECPATH" in locals() else os.path.dirname(os.path.abspath(__file__)) if "__file__" in locals() else r"C:\pemetaan-ufuk-mari-laptop"
 
 added_files = [
     (os.path.join(project_dir, "assets"), "assets"),
@@ -19,6 +19,8 @@ hidden_imports = [
     "scipy",
     "scipy.signal",
     "matplotlib",
+    "matplotlib.pyplot",
+    "matplotlib.backends.backend_agg",
     "reportlab",
     "reportlab.lib",
     "reportlab.platypus",
@@ -28,7 +30,6 @@ hidden_imports = [
     "serial.tools.list_ports",
     "core",
     "core.paths",
-    "core.camera_worker",
     "core.cv_engine",
     "core.falak_calc",
     "core.compass_service",
@@ -46,7 +47,16 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=["tkinter", "IPython", "jupyter"],
+    # PyQt5 & Tkinter tidak dipakai: aplikasi web ini memakai jendela Edge app
+    # mode dan dialog native (ctypes). Tkinter justru terbukti memicu crash
+    # tcl86t.dll ketika dijalankan bersama thread Flask.
+    excludes=[
+        "IPython", "jupyter",
+        "tkinter", "_tkinter",
+        "PyQt5", "PyQt6", "PySide2", "PySide6",
+        "core.camera_worker",
+        "PyQt5.QtCore", "PyQt5.QtGui", "PyQt5.QtWidgets",
+    ],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     noarchive=False,

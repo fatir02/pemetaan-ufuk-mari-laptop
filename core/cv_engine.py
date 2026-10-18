@@ -448,10 +448,10 @@ class HorizonDetector:
         """
         Mendeteksi objek-objek rintangan yang menonjol di atas garis ufuk mar'i
         (misal menara pemancar, puncak bukit, gedung, atau pohon tinggi).
-        
+
         Mengembalikan daftar objek dengan koordinat piksel (x, y) serta
         sudut astronomis:
-        - Derajat Horizontal (Azimuth dalam derajat)
+        - Derajat Horizontal (Azimuth awal & akhir sesuai LEBAR objek)
         - Derajat Vertikal (Elevasi / Altitudo dalam derajat)
         - Nilai prominensi / kenaikan tinggi relatif
         """
@@ -466,26 +466,77 @@ class HorizonDetector:
             return []
 
         proms = props.get("prominences", np.zeros(len(peaks)))
+        left_bases = props.get("left_bases", peaks)
+        right_bases = props.get("right_bases", peaks)
         top_indices = np.argsort(proms)[::-1][:max_peaks]
         top_peaks = sorted(peaks[top_indices])
 
+        n = len(elevations)
         obstacles = []
         for i, px in enumerate(top_peaks):
             pos = np.where(peaks == px)[0]
-            prom_val = float(proms[pos[0]]) if len(pos) > 0 else 0.0
+            pi = int(pos[0]) if len(pos) > 0 else 0
+            prom_val = float(proms[pi]) if len(pos) > 0 else 0.0
             py = float(horizon_y[px])
             az = float(azimuths[px])
             alt = float(elevations[px])
+
+            # --- LEBAR OBJEK ---
+            # Mulai dari kaki prominensi, lalu dipersempit memakai ambang 12% tinggi
+            # prominensi agar lebar mengikuti bentuk objek (bukan seluruh lereng).
+            x_start = int(left_bases[pi]) if len(pos) > 0 else int(px)
+            x_end = int(right_bases[pi]) if len(pos) > 0 else int(px)
+            x_start = max(0, min(n - 1, x_start))
+            x_end = max(0, min(n - 1, x_end))
+
+            base_elev = alt - prom_val
+            thresh = base_elev + 0.12 * max(prom_val, 0.0)
+            if prom_val > 0.0:
+                k = int(px)
+                while k > x_start and float(elevations[k - 1]) >= thresh:
+                    k -= 1
+                x_start = k
+                k = int(px)
+                while k < x_end and float(elevations[k + 1]) >= thresh:
+                    k += 1
+                x_end = k
+
+            # Cegah rentang antar objek bertumpuk: batasi sampai titik tengah
+            # antara puncak ini dengan puncak tetangga terdekat.
+            if i > 0:
+                mid_left = int(round((top_peaks[i - 1] + px) / 2.0))
+                x_start = max(x_start, mid_left)
+            if i < len(top_peaks) - 1:
+                mid_right = int(round((px + top_peaks[i + 1]) / 2.0))
+                x_end = min(x_end, mid_right)
+
+            x_start = max(0, min(n - 1, x_start))
+            x_end = max(0, min(n - 1, x_end))
+            if x_end <= x_start:
+                x_start = max(0, int(px) - 1)
+                x_end = min(n - 1, int(px) + 1)
+
+            az_start = float(azimuths[x_start])
+            az_end = float(azimuths[x_end])
+            # Pastikan urutan menaik (azimut bisa menurun bila arah bidik terbalik)
+            if az_start > az_end:
+                az_start, az_end = az_end, az_start
+
             obstacles.append({
                 "id": i + 1,
                 "x": int(px),
                 "y": int(round(py)),
+                "x_start": x_start,
+                "x_end": x_end,
                 "azimuth": round(az, 2),
+                "az_start": round(az_start, 2),
+                "az_end": round(az_end, 2),
+                "az_span": round(abs(az_end - az_start), 2),
                 "elevation": round(alt, 2),
                 "prominence": round(prom_val, 2),
                 "label": f"Objek {i + 1}",
-                "text": f"Objek {i + 1}: Az {az:.2f} deg | Alt {alt:+.2f} deg",
-                "short_text": f"Az {az:.2f}°, Alt {alt:+.2f}°",
+                "text": f"Objek {i + 1}: Az {az_start:.2f}-{az_end:.2f} deg | Alt {alt:+.2f} deg",
+                "short_text": f"Az {az_start:.2f}°-{az_end:.2f}°, Alt {alt:+.2f}°",
             })
         return obstacles
 
@@ -596,11 +647,26 @@ class HorizonDetector:
                 az_val = obs["azimuth"]
                 alt_val = obs["elevation"]
                 obj_id = obs.get("id", i + 1)
+                obj_label = (obs.get("label") or f"Objek {obj_id}").strip()
+
+                # Rentang azimut sesuai LEBAR objek (mis. 230,00 - 240,00 derajat)
+                az_start = obs.get("az_start", az_val)
+                az_end = obs.get("az_end", az_val)
+                try:
+                    az_start = float(az_start)
+                    az_end = float(az_end)
+                except (TypeError, ValueError):
+                    az_start, az_end = az_val, az_val
+                has_span = abs(az_end - az_start) > 0.05
+                if has_span:
+                    az_txt = f"{az_start:.2f}-{az_end:.2f} deg"
+                else:
+                    az_txt = f"{az_val:.2f} deg"
 
                 # Cek kedekatan dengan target_x agar kotak tidak bertumpuk
                 near_target = (target_x is not None) and (abs(px - target_x) < 45)
 
-                txt = f"Objek {obj_id}: Az {az_val:.2f} deg | Alt {alt_val:+.2f} deg"
+                txt = f"{obj_label}: Az {az_txt} | Alt {alt_val:+.2f} deg"
                 font = cv2.FONT_HERSHEY_SIMPLEX
                 font_scale = 0.40
                 thick = 1
@@ -630,6 +696,24 @@ class HorizonDetector:
                 stem_top = box_y + box_h if box_y < py else box_y
                 stem_color = (0, 220, 255)  # Kuning-amber terang
                 cv2.line(canvas, (px, py), (px, stem_top), stem_color, 1, cv2.LINE_AA)
+
+                # Penanda LEBAR objek: garis horizontal + garis batas kiri/kanan
+                xs = obs.get("x_start")
+                xe = obs.get("x_end")
+                if has_span and isinstance(xs, (int, float)) and isinstance(xe, (int, float)):
+                    xs = max(0, min(w - 1, int(xs)))
+                    xe = max(0, min(w - 1, int(xe)))
+                    if xe > xs:
+                        span_color = (255, 176, 0)  # Biru-cyan BGR
+                        # garis horizontal di bawah puncak objek
+                        span_y = min(h - 6, py + 14)
+                        cv2.line(canvas, (xs, span_y), (xe, span_y), span_color, 2, cv2.LINE_AA)
+                        # tiang batas kiri & kanan
+                        tick = 9
+                        cv2.line(canvas, (xs, span_y - tick), (xs, span_y + tick), span_color, 2, cv2.LINE_AA)
+                        cv2.line(canvas, (xe, span_y - tick), (xe, span_y + tick), span_color, 2, cv2.LINE_AA)
+                        # titik pucuk tetap ditandai
+                        cv2.line(canvas, (px, py), (px, span_y), span_color, 1, cv2.LINE_AA)
 
                 # Titik penanda pucuk objek
                 cv2.circle(canvas, (px, py), 5, (0, 0, 0), -1, cv2.LINE_AA)
