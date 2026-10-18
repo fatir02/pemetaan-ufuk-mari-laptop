@@ -102,26 +102,17 @@ def export_pdf_report(
     fig.patch.set_facecolor("#ffffff")
     ax.set_facecolor("#f9f9fb")
 
-    # Kurva Kontur Ufuk Mar'i (Garis Merah dan Area Arsiran mulai dari 0°)
-    ax.plot(azimuths, elevations, color="#d32f2f", linewidth=2.2, label="Kontur Ufuk Mar'i")
-    ax.fill_between(azimuths, np.maximum(0, elevations), 0, color="#d32f2f", alpha=0.18)
+    # Kurva kontur digambar polos tanpa label legend dan tanpa garis penanda,
+    # sesuai permintaan: tampilan grafik bersih tanpa kurva merah / garis ungu.
+    ax.plot(azimuths, elevations, color="#404040", linewidth=1.6)
+    ax.fill_between(azimuths, np.maximum(0, elevations), 0, color="#9e9e9e", alpha=0.18)
 
-    # Titik sasaran jika ada
+    # Titik sasaran jika ada (tanpa garis axvline ungu, tanpa anotasi)
     if target_analysis and "target_az" in target_analysis:
         t_az = target_analysis["target_az"]
         t_alt = target_analysis.get("alt_obstacle", target_analysis.get("target_alt", 0.0))
-        ax.axvline(t_az, color="#7b1fa2", linestyle="-.", linewidth=1.5, label=f"Azimut Sasaran ({t_az:.2f}°)")
-        ax.scatter([t_az], [t_alt], color="#7b1fa2", s=65, zorder=5)
-        ax.scatter([t_az], [t_alt], color="#ffffff", s=20, zorder=6)
-        ax.annotate(
-            f"Halangan: {t_alt:+.2f}°",
-            xy=(t_az, t_alt),
-            xytext=(t_az + 0.35, t_alt + 0.5),
-            fontsize=8,
-            fontweight="bold",
-            color="#4a148c",
-            bbox=dict(boxstyle="round,pad=0.25", facecolor="#ede7f6", edgecolor="#7b1fa2", alpha=0.9),
-        )
+        ax.scatter([t_az], [t_alt], color="#404040", s=45, zorder=5)
+        ax.scatter([t_az], [t_alt], color="#ffffff", s=15, zorder=6)
 
     # Skala sumbu X (Azimut)
     az_min = float(azimuths[0])
@@ -165,7 +156,6 @@ def export_pdf_report(
     ax.set_ylabel("Sudut Elevasi / Skala Falak (° / cm)", fontsize=9, fontweight="bold", color="#000000")
     ax.set_title("Grafik Elevasi vs Azimut", fontsize=10, fontweight="bold", color="#000000", pad=6)
     ax.grid(True, linestyle="--", alpha=0.5, color="#bdbdbd")
-    ax.legend(loc="upper right", fontsize=8, framealpha=0.9)
     plt.tight_layout()
     fig.savefig(temp_plot_path, dpi=220)
     plt.close(fig)
