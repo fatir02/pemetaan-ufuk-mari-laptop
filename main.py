@@ -16,6 +16,7 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QIcon
 
 from ui.main_window import MainWindow
+from core.paths import get_resource_path
 
 
 def main():
@@ -32,7 +33,7 @@ def main():
     app = QApplication(sys.argv)
     app.setApplicationName("PemetaanProfilUfukMari")
 
-    icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "icon.png")
+    icon_path = get_resource_path(os.path.join("assets", "icon.png"))
     if os.path.exists(icon_path):
         app.setWindowIcon(QIcon(icon_path))
 

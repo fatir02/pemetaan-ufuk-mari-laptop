@@ -10,6 +10,8 @@ import json
 import threading
 from typing import Dict, Any, Optional
 
+from core.paths import get_app_dir
+
 try:
     import serial
     import serial.tools.list_ports as list_ports
@@ -29,7 +31,7 @@ class CompassService:
         self._lock = threading.Lock()
 
         # Kalibrasi zero-tilt: default -82.7° (posisi mount fisik tegak kamera saat level)
-        self.calib_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "compass_calibration.json")
+        self.calib_file = os.path.join(get_app_dir(), "compass_calibration.json")
         self.tilt_offset = -82.7
         self._raw_tilt = -82.7
         self._load_calibration()

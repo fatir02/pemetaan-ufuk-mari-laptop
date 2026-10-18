@@ -399,29 +399,6 @@ def export_pdf_report(
         ("BOTTOMPADDING", (0, 0), (-1, -1), 3.5),
     ]))
     elements.append(t_rec)
-    elements.append(Spacer(1, 18))
-
-    # TANDA TANGAN PENGESAHAN (Halaman 2)
-    sig_table_data = [
-        [
-            Paragraph("Petugas Pengamat / Surveyor Falak,", ParagraphStyle("S1", parent=body_style, alignment=1, textColor=colors.black)),
-            Paragraph("Mengetahui / Memvalidasi:<br/>Ketua Laboratorium Falak,", ParagraphStyle("S2", parent=body_style, alignment=1, textColor=colors.black)),
-        ],
-        [
-            Spacer(1, 28),
-            Spacer(1, 28),
-        ],
-        [
-            Paragraph(f"( {obs_name_str} )", ParagraphStyle("S3", parent=body_style, alignment=1, textColor=colors.black)),
-            Paragraph("( ...................................................... )", ParagraphStyle("S4", parent=body_style, alignment=1, textColor=colors.black)),
-        ],
-    ]
-    t_sig = Table(sig_table_data, colWidths=[260, 260])
-    t_sig.setStyle(TableStyle([
-        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-    ]))
-    elements.append(KeepTogether(t_sig))
 
     # Bangun PDF
     doc.build(elements)

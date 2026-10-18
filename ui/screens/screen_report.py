@@ -20,6 +20,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt, pyqtSignal
 
 from core.report_generator import export_pdf_report, export_csv_data
+from core.paths import get_app_dir
 
 
 class ScreenReport(QWidget):
@@ -263,10 +264,7 @@ class ScreenReport(QWidget):
             )
             return
 
-        exports_dir = os.path.join(
-            os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
-            "exports"
-        )
+        exports_dir = os.path.join(get_app_dir(), "exports")
         os.makedirs(exports_dir, exist_ok=True)
         pdf_path = os.path.join(exports_dir, f"Laporan_Ufuk_{int(time.time())}.pdf")
 
@@ -299,10 +297,7 @@ class ScreenReport(QWidget):
             QMessageBox.warning(self, "Peringatan", "Belum ada data numerik pengamatan untuk diekspor.")
             return
 
-        exports_dir = os.path.join(
-            os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
-            "exports"
-        )
+        exports_dir = os.path.join(get_app_dir(), "exports")
         os.makedirs(exports_dir, exist_ok=True)
         csv_path = os.path.join(exports_dir, f"Data_Ufuk_{int(time.time())}.csv")
 

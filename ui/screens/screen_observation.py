@@ -27,6 +27,7 @@ from core.sample_generator import generate_synthetic_horizon
 from core.cv_engine import HorizonDetector
 from core.falak_calc import calculate_dip, parse_dms, format_dms
 from core.compass_service import compass_service
+from core.paths import get_resource_path
 from ui.widgets.image_viewer import InteractiveImageViewer
 
 
@@ -577,10 +578,7 @@ class ScreenObservation(QWidget):
 
     def _load_sample_landscape(self):
         """Memuat citra contoh lanskap ufuk bawaan."""
-        sample_path = os.path.join(
-            os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
-            "assets", "sample_horizon.jpg"
-        )
+        sample_path = get_resource_path(os.path.join("assets", "sample_horizon.jpg"))
         if os.path.exists(sample_path):
             img = cv2.imread(sample_path)
         else:

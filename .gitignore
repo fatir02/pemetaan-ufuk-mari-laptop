@@ -24,3 +24,6 @@ Desktop.ini
 app_log.txt
 exports/
 hasil_jepretan/
+build/
+dist/
+*.exe
