@@ -516,7 +516,7 @@ def export_csv_data(
         safe_loc = location_name.replace('"', '""')
         f.write(f"Pos Observasi Falak,\"{safe_loc}\"\n")
         f.write(f"Azimut Bidikan Utama,\"{az_center:.2f}° (Barat)\"\n")
-        f.write(f"Kerendahan Ufuk Laut Dip,\"-{dip_val:.4f}°\"\n")
+        f.write(f"Sudut Elevasi,\"-{dip_val:.4f}°\"\n")
         f.write(f"Waktu Ekspor,\"{time.strftime('%Y-%m-%d %H:%M:%S')} WIB\"\n")
         f.write("\n")
         f.write("No,Azimut (°),Elevasi / cm,Data Lokasi\n")
@@ -596,7 +596,7 @@ def export_excel_data(
     metadata = [
         ("Data Lokasi / Pos Observasi", location_name),
         ("Azimut Bidikan Utama", f"{az_center:.2f}° (Barat)"),
-        ("Kerendahan Ufuk Laut (Dip)", f"-{dip_val:.4f}°"),
+        ("Sudut Elevasi", f"-{dip_val:.4f}°"),
         ("Waktu Ekspor Data", f"{time.strftime('%Y-%m-%d %H:%M:%S')} WIB"),
     ]
     for row_idx, (lbl, val) in enumerate(metadata, start=2):
