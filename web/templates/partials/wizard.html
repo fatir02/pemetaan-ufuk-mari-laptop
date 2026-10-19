@@ -1,24 +1,8 @@
 <div class="container">
-  <!-- NAVIGASI LANGKAH -->
-  <div class="stepper" id="wizardStepper" role="tablist" aria-label="Langkah pengamatan">
-    <button type="button" class="step-item active" id="stepBtn1" onclick="goToStepFromStepper(1)" role="tab" aria-controls="stepPanel1">
-      <span class="step-num">1</span><span>Input Citra</span>
-    </button>
-    <button type="button" class="step-item" id="stepBtn2" onclick="goToStepFromStepper(2)" role="tab" aria-controls="stepPanel2" disabled>
-      <span class="step-num">2</span><span>Parameter</span>
-    </button>
-    <button type="button" class="step-item" id="stepBtn3" onclick="goToStepFromStepper(3)" role="tab" aria-controls="stepPanel3" disabled>
-      <span class="step-num">3</span><span>Hasil</span>
-    </button>
-    <button type="button" class="step-item" id="stepBtn4" onclick="goToStepFromStepper(4)" role="tab" aria-controls="stepPanel4" disabled>
-      <span class="step-num">4</span><span>Laporan</span>
-    </button>
-  </div>
-
   <div class="wizard-body">
 
     <!-- ============ LANGKAH 1: INPUT CITRA ============ -->
-    <div class="step-panel active" id="stepPanel1" role="tabpanel" aria-labelledby="stepBtn1">
+    <div class="step-panel active" id="stepPanel1" role="tabpanel">
       <!-- KARTU 1: PENGAMBILAN CITRA & KAMERA -->
       <div class="card">
         <div class="card-title">
@@ -178,13 +162,13 @@
 
       <div class="wizard-nav">
         <button type="button" class="wz-btn" disabled>Kembali</button>
-        <span class="wz-progress">Langkah 1 dari 4 — Pilih atau ambil citra</span>
+        <span class="wz-progress"><span class="wz-dots"><span class="wz-dot active"></span><span class="wz-dot"></span><span class="wz-dot"></span><span class="wz-dot"></span></span>Langkah 1 dari 4 — Pilih atau ambil citra</span>
         <button type="button" class="wz-btn primary" onclick="advanceFromStep1()">Lanjut: Parameter &rarr;</button>
       </div>
     </div>
 
     <!-- ============ LANGKAH 2: PARAMETER BIDIKAN ============ -->
-    <div class="step-panel" id="stepPanel2" role="tabpanel" aria-labelledby="stepBtn2">
+    <div class="step-panel" id="stepPanel2" role="tabpanel">
       <!-- KARTU 2: PARAMETER BIDIKAN & SENSOR -->
       <div class="card">
         <div class="card-title">
@@ -237,13 +221,13 @@
 
       <div class="wizard-nav">
         <button type="button" class="wz-btn" onclick="goToStep(1)">&larr; Kembali</button>
-        <span class="wz-progress">Langkah 2 dari 4 — Tentukan parameter bidikan</span>
+        <span class="wz-progress"><span class="wz-dots"><span class="wz-dot done"></span><span class="wz-dot active"></span><span class="wz-dot"></span><span class="wz-dot"></span></span>Langkah 2 dari 4 — Tentukan parameter bidikan</span>
         <button type="button" class="wz-btn primary" onclick="processImage()">Proses &amp; Lanjut &rarr;</button>
       </div>
     </div>
 
     <!-- ============ LANGKAH 3: HASIL ANALISIS ============ -->
-    <div class="step-panel" id="stepPanel3" role="tabpanel" aria-labelledby="stepBtn3">
+    <div class="step-panel" id="stepPanel3" role="tabpanel">
 
       <!-- WORKSPACE PLACEHOLDER SAAT BELUM PROSES -->
       <div id="rightPlaceholder" class="card placeholder-card">
@@ -325,13 +309,13 @@
 
       <div class="wizard-nav">
         <button type="button" class="wz-btn" onclick="goToStep(2)">&larr; Kembali</button>
-        <span class="wz-progress">Langkah 3 dari 4 — Periksa kontur dan grafik</span>
+        <span class="wz-progress"><span class="wz-dots"><span class="wz-dot done"></span><span class="wz-dot done"></span><span class="wz-dot active"></span><span class="wz-dot"></span></span>Langkah 3 dari 4 — Periksa kontur dan grafik</span>
         <button type="button" class="wz-btn primary" onclick="advanceToReportStep()">Lanjut: Laporan &rarr;</button>
       </div>
     </div>
 
     <!-- ============ LANGKAH 4: EVALUASI & LAPORAN ============ -->
-    <div class="step-panel" id="stepPanel4" role="tabpanel" aria-labelledby="stepBtn4">
+    <div class="step-panel" id="stepPanel4" role="tabpanel">
       <!-- KARTU 4: FORM EVALUASI LAPANGAN & PENERBITAN LAPORAN PDF -->
       <div class="card" id="evalCard" style="border: 1px solid #0284c7;">
         <div class="card-title" style="border-bottom: 1px solid #233147; padding-bottom: 8px;">
@@ -394,7 +378,7 @@
 
       <div class="wizard-nav">
         <button type="button" class="wz-btn" onclick="goToStep(3)">&larr; Kembali</button>
-        <span class="wz-progress">Langkah 4 dari 4 — Lengkapi laporan</span>
+        <span class="wz-progress"><span class="wz-dots"><span class="wz-dot done"></span><span class="wz-dot done"></span><span class="wz-dot done"></span><span class="wz-dot active"></span></span>Langkah 4 dari 4 — Lengkapi laporan</span>
         <button type="button" class="wz-btn primary" onclick="openReportPreview()">Preview PDF</button>
       </div>
     </div>

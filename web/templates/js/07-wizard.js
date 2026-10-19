@@ -1,30 +1,11 @@
-function setStepUnlocked(step, unlocked) {
-  const btn = document.getElementById('stepBtn' + step);
-  if (btn) btn.disabled = !unlocked;
-}
-
 function goToStep(step) {
   step = Math.max(1, Math.min(WIZARD_MAX_STEP, parseInt(step, 10) || 1));
   wizardStep = step;
   for (let i = 1; i <= WIZARD_MAX_STEP; i++) {
     const panel = document.getElementById('stepPanel' + i);
-    const btn = document.getElementById('stepBtn' + i);
     if (panel) panel.classList.toggle('active', i === step);
-    if (btn) {
-      btn.classList.toggle('active', i === step);
-      btn.classList.toggle('done', i < step);
-      btn.setAttribute('aria-selected', i === step ? 'true' : 'false');
-    }
   }
   window.scrollTo({ top: 0, behavior: 'smooth' });
-}
-
-function goToStepFromStepper(step) {
-  // Stepper hanya boleh membuka langkah yang sudah terbuka.
-  // Tombol navigasi bawah memakai goToStep() langsung agar tidak ikut terkunci.
-  const btn = document.getElementById('stepBtn' + step);
-  if (btn && btn.disabled && step !== wizardStep) return;
-  goToStep(step);
 }
 
 function advanceFromStep1() {
@@ -32,7 +13,6 @@ function advanceFromStep1() {
     alert("Pilih atau ambil citra terlebih dahulu sebelum melanjutkan.");
     return;
   }
-  setStepUnlocked(2, true);
   goToStep(2);
 }
 
@@ -41,14 +21,7 @@ function advanceToReportStep() {
     alert("Proses ekstraksi kontur terlebih dahulu sebelum membuka laporan.");
     return;
   }
-  setStepUnlocked(4, true);
   goToStep(4);
-}
-
-function unlockWizardThrough(step) {
-  for (let i = 1; i <= Math.min(step, WIZARD_MAX_STEP); i++) {
-    setStepUnlocked(i, true);
-  }
 }
 
 function processImage() {
@@ -119,7 +92,6 @@ function processImage() {
       document.getElementById('rightPlaceholder').style.display = 'none';
     }
     document.getElementById('resultSection').style.display = 'block';
-    unlockWizardThrough(4);
     goToStep(3);
   })
   .catch(err => {

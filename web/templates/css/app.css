@@ -72,54 +72,6 @@
     }
 
     /* Navigasi Langkah (Wizard) */
-    .stepper {
-      display: flex;
-      gap: 6px;
-      margin-bottom: 14px;
-      background: #0f172a;
-      border: 1px solid #233147;
-      border-radius: 12px;
-      padding: 6px;
-      overflow-x: auto;
-    }
-    .step-item {
-      flex: 1 1 0;
-      min-width: 96px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 7px;
-      background: transparent;
-      border: 1px solid transparent;
-      border-radius: 8px;
-      padding: 9px 8px;
-      color: #64748b;
-      font-size: 0.78rem;
-      font-weight: 700;
-      font-family: inherit;
-      cursor: pointer;
-      transition: 0.15s;
-      white-space: nowrap;
-    }
-    .step-item:hover:not(:disabled) { color: #cbd5e1; background: #162033; }
-    .step-item .step-num {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 20px;
-      height: 20px;
-      border-radius: 50%;
-      background: #1e293b;
-      color: #94a3b8;
-      font-size: 0.72rem;
-      flex: 0 0 auto;
-    }
-    .step-item.active { background: #0d243a; border-color: #0284c7; color: #38bdf8; }
-    .step-item.active .step-num { background: #0284c7; color: #ffffff; }
-    .step-item.done { color: #10b981; }
-    .step-item.done .step-num { background: #065f46; color: #6ee7b7; }
-    .step-item:disabled { opacity: 0.42; cursor: not-allowed; }
-
     .step-panel { display: none; }
     .step-panel.active { display: block; animation: stepIn 0.18s ease; }
     @keyframes stepIn {
@@ -169,6 +121,23 @@
       font-weight: 600;
       color: #94a3b8;
     }
+    .wizard-nav .wz-dots {
+      display: inline-flex;
+      gap: 5px;
+      align-items: center;
+      justify-content: center;
+      margin-right: 6px;
+      vertical-align: middle;
+    }
+    .wizard-nav .wz-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #334155;
+      display: inline-block;
+    }
+    .wizard-nav .wz-dot.active { background: #38bdf8; width: 16px; border-radius: 3px; }
+    .wizard-nav .wz-dot.done { background: #0e7490; }
 
     .card { background-color: #131b2a; border: 1px solid #233147; border-radius: 14px; padding: 16px; margin-bottom: 0; }
     .card-title { font-size: 0.94rem; font-weight: 700; color: #38bdf8; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; }

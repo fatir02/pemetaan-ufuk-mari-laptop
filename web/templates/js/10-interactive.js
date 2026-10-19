@@ -13,10 +13,7 @@ function resetObservation() {
   document.getElementById('lblPhotoStatus').innerText = "Belum ada foto yang dipilih";
   document.getElementById('lblPhotoStatus').style.color = "#94a3b8";
   resetImgZoom();
-  // Kembali ke langkah awal dan kunci kembali langkah lanjutan.
-  setStepUnlocked(2, false);
-  setStepUnlocked(3, false);
-  setStepUnlocked(4, false);
+  // Kembali ke langkah awal pengamatan.
   goToStep(1);
 }
 
