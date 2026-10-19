@@ -5,7 +5,45 @@ function goToStep(step) {
     const panel = document.getElementById('stepPanel' + i);
     if (panel) panel.classList.toggle('active', i === step);
   }
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+  syncHeaderNav();
+}
+
+function syncHeaderNav() {
+  const prev = document.getElementById('navPrevBtn');
+  const next = document.getElementById('navNextBtn');
+  if (prev) prev.disabled = wizardStep <= 1;
+  if (!next) return;
+
+  if (wizardStep === 1) {
+    next.innerHTML = 'Lanjut &rarr;';
+    next.disabled = false;
+  } else if (wizardStep === 2) {
+    next.innerHTML = 'Proses &rarr;';
+    next.disabled = false;
+  } else if (wizardStep === 3) {
+    next.innerHTML = 'Laporan &rarr;';
+    next.disabled = false;
+  } else {
+    next.innerHTML = 'Preview PDF';
+    next.disabled = false;
+  }
+}
+
+function wizardNext() {
+  if (wizardStep === 1) {
+    advanceFromStep1();
+  } else if (wizardStep === 2) {
+    processImage();
+  } else if (wizardStep === 3) {
+    advanceToReportStep();
+  } else {
+    openReportPreview();
+  }
+}
+
+function wizardPrev() {
+  if (wizardStep <= 1) return;
+  goToStep(wizardStep - 1);
 }
 
 function advanceFromStep1() {

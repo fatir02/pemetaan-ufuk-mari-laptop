@@ -1,17 +1,21 @@
-
 <div class="header">
   <div class="header-brand">
-    
     <div>
       <h1>PEMETAAN PROFIL UFUK MAR'I</h1>
       <p>Instrumen Falak Digital & Deteksi Halangan Rukyat</p>
+      <div class="header-clock">
+        <span class="clock-label">WIB (UTC+7)</span>
+        <span class="clock-val" id="clockWib">--:--:--</span>
+      </div>
     </div>
   </div>
-  <div class="header-meta">
-    <div class="clock-badge">
-      <span class="clock-label">WIB (UTC+7)</span>
-      <span class="clock-val" id="clockWib">--:--:--</span>
-    </div>
-    <span class="badge badge-laptop">Mode Laptop</span>
+
+  <div class="header-nav">
+    <button type="button" class="hdr-nav-btn" id="navPrevBtn" onclick="wizardPrev()" disabled>
+      &larr; Kembali
+    </button>
+    <button type="button" class="hdr-nav-btn primary" id="navNextBtn" onclick="wizardNext()">
+      Lanjut &rarr;
+    </button>
   </div>
 </div>
