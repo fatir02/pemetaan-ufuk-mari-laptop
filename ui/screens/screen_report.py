@@ -292,21 +292,24 @@ class ScreenReport(QWidget):
 
         try:
             overlay_to_use = self.data_package["overlay_image"]
-            if "horizon_y" in self.data_package and "profile_data" in self.data_package and "image_bgr" in self.data_package:
+            if "profile_data" in self.data_package and "raw_image" in self.data_package:
                 try:
                     from core.cv_engine import HorizonDetector
                     det = HorizonDetector()
+                    profile = self.data_package["profile_data"]
                     overlay_to_use = det.render_overlay(
-                        image_bgr=self.data_package["image_bgr"],
-                        horizon_y=self.data_package["horizon_y"],
-                        azimuths=self.data_package["profile_data"]["azimuths"],
-                        elevations=self.data_package["profile_data"]["elevations"],
+                        image_bgr=self.data_package["raw_image"],
+                        horizon_y=profile["horizon_y"],
+                        azimuths=profile["azimuths"],
+                        elevations=profile["elevations"],
                         target_az=self.data_package["azimuth"],
-                        dip_deg=self.data_package["profile_data"].get("dip_deg", 0.197),
+                        dip_deg=profile.get("dip_deg", 0.197),
                         az_center=self.data_package["azimuth"],
-                        hfov=15.0,
-                        vfov=8.5,
+                        hfov=profile.get("hfov", 15.0),
+                        vfov=profile.get("vfov", 8.5),
                         tilt_center=self.data_package["elevation"],
+                        prominent_obstacles=profile.get("prominent_obstacles", []),
+                        show_prominent_peaks=True,
                         show_target_meridian=False,
                     )
                 except Exception:

@@ -4,6 +4,7 @@ Modul QThread asinkron untuk live streaming kamera USB (eyepiece) menggunakan Op
 Mencegah UI GUI membeku (freeze) dan mendukung mode simulasi jika kamera fisik tidak tersedia.
 """
 
+import sys
 import time
 from typing import Optional
 import numpy as np
@@ -13,41 +14,60 @@ from PyQt5.QtCore import QThread, pyqtSignal, QMutex, QMutexLocker
 from core.sample_generator import generate_synthetic_horizon
 
 
+def _camera_backends():
+    """Urutan backend OpenCV yang sesuai dengan sistem operasi."""
+    if sys.platform == "darwin":
+        return [cv2.CAP_AVFOUNDATION, cv2.CAP_ANY]
+    if sys.platform.startswith("win"):
+        return [cv2.CAP_DSHOW, cv2.CAP_MSMF, cv2.CAP_ANY]
+    return [cv2.CAP_V4L2, cv2.CAP_ANY]
+
+
+def _open_camera(index: int):
+    """Coba satu indeks dengan backend native lalu fallback CAP_ANY."""
+    for backend in _camera_backends():
+        cap = None
+        try:
+            cap = cv2.VideoCapture(index, backend)
+            if cap.isOpened():
+                return cap
+        except Exception:
+            pass
+        if cap is not None:
+            cap.release()
+    return None
+
+
 def find_best_camera_index(preferred: Optional[int] = None) -> int:
     """
     Mendeteksi dan memprioritaskan kamera eksternal USB (seperti Logitech C270 / Eyepiece)
     sebelum memilih webcam internal laptop (index 0).
     """
-    import sys
+    candidates = []
     if preferred is not None and preferred >= 0:
-        return preferred
-
-    backend = cv2.CAP_DSHOW if sys.platform.startswith("win") else cv2.CAP_ANY
-
-    # Cek index 1 s.d. 3 (kamera eksternal Logitech / USB)
-    for idx in [1, 2, 3]:
+        candidates.append(int(preferred))
+    # Kamera eksternal diprioritaskan setelah preferred; indeks 0 tetap menjadi
+    # fallback kamera internal laptop.
+    candidates.extend(idx for idx in [1, 2, 3, 0] if idx not in candidates)
+    for idx in candidates:
+        cap = None
         try:
-            cap = cv2.VideoCapture(idx, backend)
-            if cap.isOpened():
-                ret, _ = cap.read()
+            cap = _open_camera(idx)
+            if cap is not None:
+                # Beberapa webcam memerlukan beberapa frame untuk warm-up.
+                ret = False
+                for _ in range(5):
+                    ret, frame = cap.read()
+                    if ret and frame is not None:
+                        break
                 cap.release()
                 if ret:
                     return idx
         except Exception:
-            pass
+            if cap is not None:
+                cap.release()
 
-    # Fallback ke index 0 (kamera internal laptop)
-    try:
-        cap = cv2.VideoCapture(0, backend)
-        if cap.isOpened():
-            ret, _ = cap.read()
-            cap.release()
-            if ret:
-                return 0
-    except Exception:
-        pass
-
-    return 0
+    return int(preferred) if preferred is not None and preferred >= 0 else -1
 
 
 class CameraWorker(QThread):
@@ -61,7 +81,7 @@ class CameraWorker(QThread):
 
     def __init__(self, camera_index: Optional[int] = None, is_simulation: bool = False, parent=None):
         super().__init__(parent)
-        self.camera_index = find_best_camera_index(camera_index) if camera_index is None else camera_index
+        self.camera_index = camera_index
         self.is_simulation = is_simulation
         self._running = False
         self._mutex = QMutex()
@@ -89,34 +109,35 @@ class CameraWorker(QThread):
 
     def run(self):
         self._running = True
-        self.status_changed.emit(True, f"Kamera terhubung (Mode: {'Simulasi' if self.is_simulation else f'USB Device #{self.camera_index}'})")
 
         cap = None
         if not self.is_simulation:
-            import sys
-            if sys.platform.startswith("win"):
-                cap = cv2.VideoCapture(self.camera_index, cv2.CAP_DSHOW)
-            else:
-                cap = cv2.VideoCapture(self.camera_index, cv2.CAP_V4L2)
+            self.status_changed.emit(True, "Mencari kamera fisik...")
+            selected_index = find_best_camera_index(self.camera_index)
+            if selected_index >= 0:
+                self.camera_index = selected_index
+                cap = _open_camera(selected_index)
 
-            if not cap.isOpened():
-                # Fallback ke default capture
-                cap = cv2.VideoCapture(self.camera_index)
-
-            if not cap.isOpened():
+            if cap is None or not cap.isOpened():
                 self.error_occurred.emit(
-                    f"Gagal membuka kamera USB index #{self.camera_index}. "
-                    "Beralih otomatis ke mode simulasi sensor falak."
+                    "Kamera fisik tidak dapat dibuka. Periksa izin kamera sistem, "
+                    "pastikan kamera tidak digunakan aplikasi lain, lalu coba lagi."
                 )
-                self.is_simulation = True
                 if cap is not None:
                     cap.release()
-                cap = None
+                self._running = False
+                self.status_changed.emit(False, "Kamera tidak tersedia")
+                return
             else:
                 # Set resolusi standar HD 1280x720 jika didukung
                 cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
                 cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
                 cap.set(cv2.CAP_PROP_FPS, 30)
+
+        self.status_changed.emit(
+            True,
+            f"Kamera terhubung ({'Simulasi' if self.is_simulation else f'Device #{self.camera_index}'})",
+        )
 
         # Baseline simulasi jika dalam mode simulasi
         base_sim_frame = None

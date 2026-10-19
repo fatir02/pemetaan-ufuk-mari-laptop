@@ -1,0 +1,99 @@
+<!-- VIEWER TABEL DATA NUMERIK INTERAKTIF -->
+<div id="dataTableModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(5, 8, 14, 0.96); z-index: 9999; flex-direction: column;">
+  <div class="preview-doc-header">
+    <div style="display: flex; align-items: center; gap: 8px;">
+      <button type="button" class="doc-btn" onclick="closeDataTableModal()">Kembali</button>
+      <h2>Tabel Data Numerik Profil Ufuk Mar'i</h2>
+    </div>
+
+    <div class="doc-toolbar">
+      <label style="font-size: 0.76rem; color: #94a3b8; margin: 0 4px 0 0;">Kerapatan:</label>
+      <select id="selTableInterval" onchange="renderDataTable(this.value)" style="background: #1e293b; color: #38bdf8; border: 1px solid #334155; border-radius: 6px; padding: 6px 8px; font-size: 0.8rem; font-weight: bold; outline: none;">
+        <option value="0.5">Interval 0.5°</option>
+        <option value="1">Interval 1°</option>
+        <option value="10">Interval 10°</option>
+      </select>
+      <button type="button" class="doc-btn" style="background: #10b981; color: #fff; font-weight: bold;" onclick="downloadExcel()">Unduh Excel (.xlsx)</button>
+    </div>
+  </div>
+
+  <!-- Ringkasan Statistik Tabel -->
+  <div style="background: #111726; padding: 8px 16px; border-bottom: 1px solid #1e293b; display: flex; gap: 16px; flex-wrap: wrap; font-size: 0.78rem;">
+    <span style="color: #94a3b8;">Total Baris: <b id="tblSampleCount" style="color: #38bdf8;">--</b></span>
+    <span style="color: #94a3b8;">Rentang Azimut: <b id="tblAzRange" style="color: #38bdf8;">--</b></span>
+    <span style="color: #94a3b8;">Sudut Elevasi: <b id="tblDipVal" style="color: #38bdf8;">--</b></span>
+    <span style="color: #94a3b8;">Elevasi Min/Max: <b id="tblElevRange" style="color: #38bdf8;">--</b></span>
+  </div>
+
+  <!-- Area Tabel Scrollable -->
+  <div style="flex: 1; overflow: auto; padding: 14px 16px; background-color: #070a10;">
+    <div style="max-width: 1300px; margin: 0 auto; background: #131b2a; border: 1px solid #233147; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.5);">
+      <table id="numericTable" style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.82rem;">
+        <thead>
+          <tr style="background: #0f172a; color: #38bdf8; border-bottom: 2px solid #233147; position: sticky; top: 0; z-index: 2;">
+            <th style="padding: 10px 12px; font-weight: bold; border-right: 1px solid #1e293b; width: 60px; text-align: center;">No</th>
+            <th style="padding: 10px 12px; font-weight: bold; border-right: 1px solid #1e293b; text-align: center;">Azimut (°)</th>
+            <th style="padding: 10px 12px; font-weight: bold; border-right: 1px solid #1e293b; text-align: center;">Elevasi / cm</th>
+            <th style="padding: 10px 12px; font-weight: bold; text-align: center;">Data Lokasi</th>
+          </tr>
+        </thead>
+        <tbody id="numericTableBody">
+          <!-- Diisi lewat JS -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- VIEWER FULLSCREEN FOTO MENTAH + OVERLAY VEKTOR -->
+<div id="skylineEditorModal">
+  <div class="sky-editor-toolbar">
+    <div class="sky-editor-tools">
+      <button type="button" class="doc-btn" onclick="closeSkylineEditor()">Tutup</button>
+      <button type="button" id="skyModeNavigate" class="doc-btn sky-tool active" onclick="setSkyEditorMode('navigate')">Navigasi</button>
+      <button type="button" id="skyModeEdit" class="doc-btn sky-tool" onclick="setSkyEditorMode('edit')">Edit Garis</button>
+      <button type="button" id="skyModeAdd" class="doc-btn sky-tool" onclick="setSkyEditorMode('add')">Tambah Objek</button>
+      <select id="skyObjectType" style="width:auto;padding:6px 8px;font-size:.78rem;">
+        <option>Menara/Antena</option><option>Vegetasi/Pohon</option><option>Bangunan/Atap</option><option>Bukit/Terrain</option><option>Halangan Ufuk</option>
+      </select>
+    </div>
+    <div class="sky-editor-tools">
+      <span id="skyEditorStatus" class="sky-editor-status">Roda/pinch untuk zoom • drag untuk pan</span>
+      <button type="button" class="doc-btn" onclick="resetSkyEditorView()">Reset</button>
+      <button type="button" class="doc-btn" style="background:#059669;color:#fff" onclick="saveSkylineEdits()">Simpan Koreksi</button>
+    </div>
+  </div>
+  <div id="skylineEditorViewport">
+    <svg id="skylineEditorSvg" xmlns="http://www.w3.org/2000/svg"></svg>
+    <div id="skylineTooltip"></div>
+  </div>
+</div>
+
+<!-- VIEWER DOKUMEN LAPORAN PDF INTERAKTIF -->
+<div id="reportPreviewModal">
+  <div class="preview-doc-header">
+    <div style="display: flex; align-items: center; gap: 8px;">
+      <button type="button" class="doc-btn" onclick="closeReportPreview()">Tutup</button>
+      <h2>Preview Dokumen Laporan</h2>
+    </div>
+
+    <div class="doc-toolbar">
+      <button type="button" class="doc-btn" onclick="stepZoom(-0.2)">-</button>
+      <span id="lblZoomLevel" style="color: #38bdf8; font-weight: bold; font-size: 0.85rem; min-width: 44px; text-align: center;">100%</span>
+      <button type="button" class="doc-btn" onclick="stepZoom(0.2)">+</button>
+      <button type="button" class="doc-btn" onclick="resetZoom()">100%</button>
+      <button type="button" class="doc-btn" onclick="fitWidthZoom()">Lebar Penuh</button>
+      <button type="button" class="doc-btn" style="background: #059669; color: #fff;" onclick="downloadCurrentPdf()">Unduh PDF</button>
+    </div>
+  </div>
+
+  <div class="doc-zoombar">
+    <span style="font-size: 0.78rem; color: #94a3b8; white-space: nowrap;">Perbesaran:</span>
+    <input type="range" id="zoomSlider" min="40" max="280" value="100" step="5" oninput="setZoomScale(this.value / 100.0)">
+  </div>
+
+  <div class="doc-viewport" id="docViewport">
+    <div class="doc-container" id="docContainer">
+    </div>
+  </div>
+</div>

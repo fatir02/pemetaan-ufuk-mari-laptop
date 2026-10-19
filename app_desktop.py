@@ -1,6 +1,6 @@
 """
 app_desktop.py
-Peluncur Aplikasi Desktop Mandiri (Native Window via Microsoft Edge / Chrome App Mode).
+Peluncur Aplikasi Desktop Mandiri (native embedded WebView, tanpa Chrome/Chromium).
 Menjalankan backend Flask secara lokal di latar belakang dan membungkus seluruh
 antarmuka web ke dalam satu jendela aplikasi desktop profesional.
 
@@ -81,14 +81,27 @@ def acquire_mutex_nonblocking():
 
 def find_app_browser():
     """Cari browser modern (Edge / Chrome) untuk mode standalone window tanpa address bar."""
-    candidates = [
-        os.path.expandvars(r"%ProgramFiles(x86)%\Microsoft\Edge\Application\msedge.exe"),
-        os.path.expandvars(r"%ProgramFiles%\Microsoft\Edge\Application\msedge.exe"),
-        os.path.expandvars(r"%LocalAppData%\Microsoft\Edge\Application\msedge.exe"),
-        os.path.expandvars(r"%ProgramFiles%\Google\Chrome\Application\chrome.exe"),
-        os.path.expandvars(r"%ProgramFiles(x86)%\Google\Chrome\Application\chrome.exe"),
-        os.path.expandvars(r"%LocalAppData%\Google\Chrome\Application\chrome.exe"),
-    ]
+    if sys.platform == "darwin":
+        candidates = [
+            "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+            "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+            os.path.expanduser("~/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge"),
+            os.path.expanduser("~/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"),
+        ]
+    elif sys.platform.startswith("win"):
+        candidates = [
+            os.path.expandvars(r"%ProgramFiles(x86)%\Microsoft\Edge\Application\msedge.exe"),
+            os.path.expandvars(r"%ProgramFiles%\Microsoft\Edge\Application\msedge.exe"),
+            os.path.expandvars(r"%LocalAppData%\Microsoft\Edge\Application\msedge.exe"),
+            os.path.expandvars(r"%ProgramFiles%\Google\Chrome\Application\chrome.exe"),
+            os.path.expandvars(r"%ProgramFiles(x86)%\Google\Chrome\Application\chrome.exe"),
+            os.path.expandvars(r"%LocalAppData%\Google\Chrome\Application\chrome.exe"),
+        ]
+    else:
+        candidates = [
+            "/usr/bin/microsoft-edge", "/usr/bin/microsoft-edge-stable",
+            "/usr/bin/google-chrome", "/usr/bin/google-chrome-stable", "/usr/bin/chromium",
+        ]
     for c in candidates:
         if os.path.exists(c):
             return c
@@ -182,6 +195,8 @@ def _find_app_hwnds():
 
     Memakai Windows API langsung (ctypes) — tanpa menjalankan proses apa pun.
     """
+    if not sys.platform.startswith("win"):
+        return []
     import ctypes
     from ctypes import wintypes
 
@@ -226,6 +241,8 @@ def focus_app_window():
 
 def close_stale_app_windows():
     """Tutup jendela-jendela aplikasi lama yang servernya sudah mati (zombie)."""
+    if not sys.platform.startswith("win"):
+        return
     import ctypes
     user32 = ctypes.windll.user32
     WM_CLOSE = 0x0010
@@ -263,6 +280,8 @@ def show_starting_window(state):
     Kotak dialog native (MessageBoxTimeoutW) bebas dari masalah itu dan
     menutup sendiri otomatis.
     """
+    if not sys.platform.startswith("win"):
+        return
     import ctypes
     import threading
 
@@ -326,11 +345,11 @@ def _grant_camera_permission(profile_root, port):
 
 
 def _open_window_to(port):
-    """Buka jendela aplikasi ke server yang sudah hidup (tanpa server baru)."""
+    """Fallback lama: buka browser eksternal bila diminta secara eksplisit."""
     browser = find_app_browser()
     url = f"http://127.0.0.1:{port}"
     profile_root = os.path.join(
-        os.environ.get("LOCALAPPDATA", tempfile.gettempdir()),
+        os.environ.get("LOCALAPPDATA") or os.path.join(os.path.expanduser("~"), ".pemetaan-ufuk-mari"),
         "PemetaanUfukMari",
         "browser_profile",
     )
@@ -353,6 +372,180 @@ def _open_window_to(port):
         log("browser default dibuka ke %s" % url)
 
 
+def open_embedded_window(port):
+    """Buka UI pada WebView native dan blokir sampai jendela ditutup.
+
+    pywebview memakai WKWebView/WebKit di macOS (termasuk Hackintosh) dan
+    WebView2 di Windows, sehingga Chrome/Chromium tidak dijalankan sebagai UI.
+    """
+    try:
+        import webview
+    except ImportError as exc:
+        raise RuntimeError(
+            "Komponen native webview belum terpasang. Jalankan: "
+            "python -m pip install -r requirements.txt"
+        ) from exc
+
+    if sys.platform == "darwin":
+        _configure_macos_camera_webview()
+
+    url = f"http://127.0.0.1:{port}"
+    storage_path = os.path.join(
+        os.environ.get("LOCALAPPDATA") or os.path.join(os.path.expanduser("~"), ".pemetaan-ufuk-mari"),
+        "native_webview",
+    )
+    os.makedirs(storage_path, exist_ok=True)
+    log("membuka native webview ke %s" % url)
+    webview.create_window(
+        "Pemetaan Ufuk Mar'i",
+        url=url,
+        width=1360,
+        height=860,
+        min_size=(960, 640),
+        resizable=True,
+        background_color="#0b0f17",
+        text_select=True,
+        zoomable=False,
+    )
+    # Pemilihan engine otomatis: Cocoa/WKWebView pada macOS dan WebView2 pada
+    # Windows. start() sengaja berjalan di main thread sesuai syarat pywebview.
+    webview.start(
+        debug=False,
+        private_mode=False,
+        storage_path=storage_path,
+        icon=os.path.join(BASE_DIR, "assets", "icon.png"),
+    )
+    log("native webview ditutup")
+
+
+def _invoke_objc_block(block_obj, value):
+    """Panggil block Objective-C ``void (^)(NSInteger)`` dari PyObjC.
+
+    Block yang diterima dari WKUIDelegate tidak membawa metadata signature,
+    sehingga ``block(value)`` gagal dengan "cannot call block without a
+    signature". Pemanggilan langsung lewat ABI block layout diperlukan:
+    ``isa, flags, reserved, invoke, descriptor`` — fungsi invoke ada di offset
+    ketiga (indeks 2 dari array pointer).
+    """
+    import ctypes
+
+    import objc
+
+    ptr = objc.pyobjc_id(block_obj)
+    if not ptr:
+        raise RuntimeError("block Objective-C tidak memiliki pointer")
+    words = (ctypes.c_void_p * 4).from_address(ptr)
+    invoke = words[2]
+    if not invoke:
+        raise RuntimeError("block Objective-C tidak memiliki fungsi invoke")
+    ctypes.CFUNCTYPE(None, ctypes.c_void_p, ctypes.c_long)(invoke)(
+        ctypes.c_void_p(ptr), ctypes.c_long(int(value))
+    )
+
+
+def _configure_macos_camera_webview():
+    """Izinkan getUserMedia pada WKWebView yang dibungkus pywebview.
+
+    pywebview 6.x belum memasang callback permission media pada Cocoa. Tanpa
+    callback ini WKWebView dapat menolak kamera lokal sebelum dialog izin macOS
+    muncul. Origin aplikasi hanya server loopback yang dibuat launcher ini.
+    """
+    try:
+        import AppKit
+        import Foundation
+        import WebKit
+        import objc
+        from webview.platforms import cocoa
+
+        bundle = AppKit.NSBundle.mainBundle()
+        info = bundle.localizedInfoDictionary() or bundle.infoDictionary()
+        info["NSCameraUsageDescription"] = (
+            "Kamera digunakan untuk mengambil foto profil ufuk secara langsung."
+        )
+
+        selector_name = (
+            "webView_requestMediaCapturePermissionForOrigin_"
+            "initiatedByFrame_type_decisionHandler_"
+        )
+        delegate = cocoa.BrowserView.BrowserDelegate
+        if not hasattr(delegate, selector_name):
+            # Signature: void (self, _cmd, WKWebView*, WKSecurityOrigin*,
+            # WKFrameInfo*, NSInteger type, block decisionHandler).
+            # 'type' adalah NSInteger (q) dan decisionHandler adalah block (@?).
+            def grant_camera(self, webview_obj, origin, frame, capture_type, handler):
+                # Handler wajib dipanggil tepat sekali. Bila ada error saat
+                # membaca origin, tetap berikan keputusan agar getUserMedia
+                # tidak menggantung.
+                decision = WebKit.WKPermissionDecisionDeny
+                try:
+                    host = ""
+                    try:
+                        host = str(origin.host() or "").lower()
+                    except Exception:
+                        host = ""
+                    allowed = host in {"127.0.0.1", "localhost"}
+                    decision = (
+                        WebKit.WKPermissionDecisionGrant
+                        if allowed
+                        else WebKit.WKPermissionDecisionDeny
+                    )
+                    log(
+                        "permintaan izin media webview host=%r type=%s -> %s"
+                        % (host, capture_type, decision)
+                    )
+                except Exception as exc:
+                    log("gagal mengevaluasi izin media webview: %r" % (exc,))
+                finally:
+                    try:
+                        _invoke_objc_block(handler, decision)
+                    except Exception as exc:
+                        log("gagal memanggil decisionHandler media: %r" % (exc,))
+
+            grant_camera = objc.selector(
+                grant_camera,
+                selector=(
+                    b"webView:requestMediaCapturePermissionForOrigin:"
+                    b"initiatedByFrame:type:decisionHandler:"
+                ),
+                signature=b"v@:@@@q@?<v@q>",
+            )
+            setattr(delegate, selector_name, grant_camera)
+
+        log("izin kamera WKWebView dikonfigurasi untuk origin loopback")
+    except Exception as exc:
+        # Jangan menggagalkan seluruh aplikasi; UI akan memberikan pesan izin
+        # getUserMedia jika versi WebKit tidak mendukung callback tersebut.
+        log("konfigurasi izin kamera WKWebView gagal: %r" % (exc,))
+
+
+def launch_application_window(port):
+    """Jalankan native WebView; browser fallback harus diizinkan eksplisit."""
+    try:
+        open_embedded_window(port)
+        return True
+    except Exception as exc:
+        log("native webview gagal: %r" % (exc,))
+        if os.environ.get("PEMETAAN_ALLOW_BROWSER_FALLBACK") == "1":
+            _open_window_to(port)
+            return True
+
+        message = (
+            "Jendela native WebView gagal dibuka.\n\n"
+            f"{exc}\n\n"
+            "Pasang ulang dependensi dengan:\n"
+            "python -m pip install -r requirements.txt"
+        )
+        if sys.platform.startswith("win"):
+            try:
+                import ctypes
+                ctypes.windll.user32.MessageBoxW(0, message, "Pemetaan Ufuk Mar'i", 0x10)
+            except Exception:
+                print(message, file=sys.stderr)
+        else:
+            print(message, file=sys.stderr)
+        return False
+
+
 def converge_to_existing(port):
     """Satukan ke instance yang sudah jalan: fokuskan jendelanya."""
     for _ in range(10):
@@ -364,8 +557,7 @@ def converge_to_existing(port):
             log("jendela aplikasi yang ada difokuskan (port %s)" % port)
             return True
         time.sleep(1.0)
-    _open_window_to(port)
-    return True
+    return launch_application_window(port)
 
 
 # ---------------- PROGRAM UTAMA ----------------
@@ -429,28 +621,8 @@ def main():
 
     time.sleep(0.6)
 
-    _open_window_to(port)
-
-    # Menunggu jendela aplikasi ditutup oleh pengguna.
-    # Yang diawasi: ADA/TIDAKNYA jendela berjudul aplikasi (bukan umur proses
-    # peluncur Edge, karena Edge me-reuse proses dan peluncur bisa cepat keluar).
     try:
-        time.sleep(5.0)  # masa tenggang: judul jendela butuh waktu terpasang
-        grace = 25.0
-        grace_start = time.time()
-        while time.time() - grace_start < grace:
-            if app_window_exists():
-                break
-            time.sleep(1.0)
-        else:
-            log("jendela aplikasi tidak pernah muncul, keluar")
-            return
-
-        while True:
-            time.sleep(1.0)
-            if not app_window_exists():
-                log("jendela aplikasi sudah tertutup, keluar")
-                break
+        launch_application_window(port)
     except (KeyboardInterrupt, SystemExit):
         pass
     finally:

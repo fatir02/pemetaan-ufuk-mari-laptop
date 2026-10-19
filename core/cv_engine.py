@@ -6,11 +6,8 @@ per kolom horizontal, mengonversi ke profil elevasi sudut astronomi.
 """
 
 from typing import Tuple, Dict, Any, Optional, List
-from itertools import groupby
-from operator import itemgetter
 import numpy as np
 import cv2
-from scipy.signal import medfilt
 
 from core.falak_calc import (
     pixel_to_azimuth_elevation,
@@ -38,6 +35,545 @@ class HorizonDetector:
         self.last_azimuths = None
         self.last_elevations = None
         self.last_bw_data = None
+        # Kandidat struktur ramping (menara/antena/tiang) dari tahap detail.
+        # Disimpan terpisah agar detect_prominent_obstacles tidak hanya bergantung
+        # pada scipy.find_peaks yang tidak dapat mengenali puncak di endpoint.
+        self.last_detail_obstacles: List[Dict[str, Any]] = []
+        self.last_active_bounds = (0, 0)
+        self.last_image_bgr: Optional[np.ndarray] = None
+
+    @staticmethod
+    def _group_true_runs(flags: np.ndarray, max_gap: int = 1) -> List[Tuple[int, int]]:
+        """Kelompokkan indeks True, sambil menjembatani gap horizontal kecil."""
+        idx = np.flatnonzero(flags)
+        if len(idx) == 0:
+            return []
+        groups: List[Tuple[int, int]] = []
+        start = prev = int(idx[0])
+        for value in idx[1:]:
+            value = int(value)
+            if value - prev > max_gap + 1:
+                groups.append((start, prev))
+                start = value
+            prev = value
+        groups.append((start, prev))
+        return groups
+
+    def _detect_slender_obstacles(
+        self,
+        image_bgr: np.ndarray,
+        base_horizon: np.ndarray,
+        x_start: int,
+        x_end: int,
+        y_min: int,
+    ) -> Tuple[np.ndarray, List[Dict[str, Any]]]:
+        """Deteksi struktur ramping di atas baseline tanpa mengganggu DP utama.
+
+        Jalur ini sengaja memakai citra detail yang lebih sedikit dihaluskan.
+        Kandidat harus berawal dekat baseline, tetapi boleh memiliki gap vertikal
+        pendek agar menara kisi, antena, dan citra JPEG tetap dapat dikenali.
+        """
+        h, w = image_bgr.shape[:2]
+        base = np.asarray(base_horizon, dtype=np.float64)
+        final_horizon = base.copy()
+        if h < 30 or w < 30 or x_end < x_start:
+            return final_horizon, []
+
+        gray_raw = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2GRAY)
+        detail = cv2.GaussianBlur(gray_raw, (3, 3), 0.55)
+
+        # Latar langit lokal dihitung secara horizontal. Objek vertikal sempit
+        # menjadi lebih gelap daripada estimasi ini, sedangkan awan/bukit lebar
+        # cenderung ikut masuk ke background dan memperoleh respons kecil.
+        bg_width = max(31, int(round(w * 0.045)) | 1)
+        bg_width = min(bg_width, 151 if w >= 151 else (w - 1) | 1)
+        sky_background = cv2.GaussianBlur(detail, (bg_width, 1), 0)
+        dark_response = sky_background.astype(np.float32) - detail.astype(np.float32)
+
+        roi_height = max(24, int(round(h * 0.18)))
+        min_height = max(5, int(round(h * 0.006)))
+        max_width = max(24, int(round(w * 0.04)))
+        attach_tolerance = max(3, int(round(h * 0.005)))
+        max_vertical_gap = max(4, int(round(h * 0.009)))
+
+        # Ambang rendah diperlukan untuk struktur 1-3 px, tetapi tetap ditopang
+        # validasi kontinuitas, aspect ratio, kontras samping, dan attachment.
+        response_mask = (dark_response >= 6.0).astype(np.uint8) * 255
+        close_h = max_vertical_gap * 2 + 1
+        response_closed = cv2.morphologyEx(
+            response_mask,
+            cv2.MORPH_CLOSE,
+            cv2.getStructuringElement(cv2.MORPH_RECT, (1, close_h)),
+        )
+
+        tops = base.copy()
+        heights = np.zeros(w, dtype=np.float64)
+        continuities = np.zeros(w, dtype=np.float64)
+        attachments = np.zeros(w, dtype=np.float64)
+
+        for x in range(x_start, x_end + 1):
+            bottom = min(h - 1, int(round(base[x])) + attach_tolerance)
+            top_limit = max(y_min, int(round(base[x])) - roi_height)
+            if bottom <= top_limit:
+                continue
+
+            col_closed = response_closed[top_limit:bottom + 1, x] > 0
+            col_raw = response_mask[top_limit:bottom + 1, x] > 0
+            base_pos = int(round(base[x])) - top_limit
+            search_lo = max(0, base_pos - attach_tolerance)
+            search_hi = min(len(col_closed), base_pos + attach_tolerance + 1)
+            anchors = np.flatnonzero(col_closed[search_lo:search_hi])
+            if len(anchors) == 0:
+                continue
+
+            anchor = search_lo + int(anchors[-1])
+            cursor = anchor
+            gap = 0
+            highest = anchor
+            while cursor >= 0:
+                if col_closed[cursor]:
+                    highest = cursor
+                    gap = 0
+                else:
+                    gap += 1
+                    if gap > max_vertical_gap:
+                        break
+                cursor -= 1
+
+            top_y = top_limit + highest
+            height_px = float(base[x] - top_y)
+            if height_px < min_height:
+                continue
+
+            seg_end = min(len(col_raw), base_pos + 1)
+            segment = col_raw[highest:seg_end]
+            continuity = float(np.mean(segment)) if len(segment) else 0.0
+            tops[x] = float(top_y)
+            heights[x] = height_px
+            continuities[x] = continuity
+            attachments[x] = 1.0
+
+        active_columns = heights >= min_height
+        candidates: List[Dict[str, Any]] = []
+        for group_start, group_end in self._group_true_runs(active_columns, max_gap=2):
+            width = group_end - group_start + 1
+            if width > max_width:
+                continue
+
+            cols = np.arange(group_start, group_end + 1)
+            valid_cols = cols[heights[cols] >= min_height]
+            if len(valid_cols) == 0:
+                continue
+            tip_x = int(valid_cols[np.argmin(tops[valid_cols])])
+            tip_y = float(tops[tip_x])
+            base_y = float(np.median(base[valid_cols]))
+            height_px = max(0.0, base_y - tip_y)
+            aspect = height_px / max(1.0, float(width))
+            continuity = float(np.mean(continuities[valid_cols]))
+
+            # Kontras median di kedua sisi. Di endpoint active image, satu sisi
+            # saja cukup sehingga menara yang terpotong frame tidak dibuang.
+            y0 = max(y_min, int(round(tip_y)))
+            y1 = min(h, int(round(tip_y + max(4.0, height_px * 0.55))))
+            object_patch = detail[y0:y1, group_start:group_end + 1]
+            object_level = float(np.median(object_patch)) if object_patch.size else 255.0
+            side_span = max(5, min(20, width * 2 + 3))
+            side_levels = []
+            if group_start > x_start:
+                left = detail[y0:y1, max(x_start, group_start - side_span):group_start]
+                if left.size:
+                    side_levels.append(float(np.median(left)))
+            if group_end < x_end:
+                right = detail[y0:y1, group_end + 1:min(x_end + 1, group_end + 1 + side_span)]
+                if right.size:
+                    side_levels.append(float(np.median(right)))
+            contrast = max(0.0, (min(side_levels) - object_level) if side_levels else 0.0)
+
+            # Skor lunak: kandidat tidak langsung gugur hanya karena satu ciri
+            # (mis. kontras saat berkabut) sedikit di bawah nilai ideal.
+            height_score = min(1.0, height_px / max(12.0, h * 0.025))
+            aspect_score = min(1.0, aspect / 2.0)
+            contrast_score = min(1.0, contrast / 18.0)
+            continuity_score = min(1.0, continuity / 0.60)
+            edge_bonus = 0.08 if group_start <= x_start + 1 or group_end >= x_end - 1 else 0.0
+            confidence = min(1.0,
+                0.24 * height_score
+                + 0.20 * aspect_score
+                + 0.24 * contrast_score
+                + 0.24 * continuity_score
+                + 0.08 * float(np.mean(attachments[valid_cols]))
+                + edge_bonus
+            )
+
+            # Struktur sangat tipis mendapat toleransi; blob lebar wajib punya
+            # kontras/aspect lebih kuat untuk menekan awan dan bayangan bukit.
+            accepted = confidence >= 0.48 and continuity >= 0.28 and aspect >= 0.75
+            if not accepted:
+                continue
+
+            # Isi gap horizontal pendek memakai interpolasi top dari kolom valid.
+            group_cols = np.arange(group_start, group_end + 1)
+            interp_top = np.interp(group_cols, valid_cols, tops[valid_cols])
+            final_horizon[group_cols] = np.minimum(final_horizon[group_cols], interp_top)
+            candidates.append({
+                "x": tip_x,
+                "y": int(round(tip_y)),
+                "x_start": int(group_start),
+                "x_end": int(group_end),
+                "height_px": round(height_px, 2),
+                "width_px": int(width),
+                "continuity": round(continuity, 3),
+                "contrast": round(contrast, 2),
+                "confidence": round(confidence, 3),
+                "is_endpoint": bool(group_start <= x_start + 1 or group_end >= x_end - 1),
+                "source": "detail_vertical",
+            })
+
+        return final_horizon, candidates
+
+    def _estimate_bottom_connected_prior(
+        self,
+        gray: np.ndarray,
+        y_min: int,
+        y_max: int,
+        x_start: int,
+        x_end: int,
+    ) -> Tuple[np.ndarray, float]:
+        """Estimasi batas permukaan yang benar-benar terhubung ke bawah citra.
+
+        Awan ekstrem dapat mempunyai gradien lebih kuat daripada ufuk. Karena
+        awan umumnya tidak terhubung ke daratan di bawah foto, prior ini memakai
+        komponen gelap bottom-connected. Horizontal opening sementara membuang
+        pohon/menara ramping agar awan yang bersentuhan secara visual dengannya
+        tidak ikut dianggap daratan. Struktur tersebut ditambahkan kembali oleh
+        detector detail setelah baseline utama ditemukan.
+
+        Returns:
+            (prior_y_per_column, confidence_0_to_1)
+        """
+        h, w = gray.shape[:2]
+        active_w = max(1, x_end - x_start + 1)
+        work = cv2.GaussianBlur(gray, (5, 5), 1.0)
+
+        # Otsu dihitung pada 65% bagian bawah: cukup mencakup bukit/laut/tanah,
+        # tetapi tidak didominasi kubah langit biru bagian atas.
+        lower_top = max(y_min, int(round(h * 0.35)))
+        lower = work[lower_top:y_max, x_start:x_end + 1]
+        if lower.size == 0:
+            return np.full(w, h * 0.65, dtype=np.float64), 0.0
+        otsu, _ = cv2.threshold(lower, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+        dark = (work <= float(otsu)).astype(np.uint8) * 255
+
+        # Hilangkan konektor sempit vertikal (pohon/menara) sebelum flood dari
+        # bawah. Massa daratan horizontal tetap dipertahankan.
+        open_w = max(7, int(round(active_w * 0.018)) | 1)
+        opened = cv2.morphologyEx(
+            dark,
+            cv2.MORPH_OPEN,
+            cv2.getStructuringElement(cv2.MORPH_RECT, (open_w, 3)),
+        )
+        opened = cv2.morphologyEx(
+            opened,
+            cv2.MORPH_CLOSE,
+            cv2.getStructuringElement(cv2.MORPH_RECT, (max(5, open_w // 2) | 1, 5)),
+        )
+        opened[:, :x_start] = 0
+        opened[:, x_end + 1:] = 0
+
+        count, labels, stats, _ = cv2.connectedComponentsWithStats(opened, connectivity=8)
+        connected = np.zeros_like(opened)
+        seed_top = max(0, h - max(4, int(round(h * 0.025))))
+        seed_labels = set(int(v) for v in np.unique(labels[seed_top:h, x_start:x_end + 1]) if int(v) != 0)
+        # Jika dasar foto sangat terang, izinkan komponen besar yang mencapai
+        # dekat dasar sebagai fallback, tetapi bukan cloud blob menggantung.
+        if not seed_labels:
+            for label in range(1, count):
+                x, y, ww, hh, area = stats[label]
+                if y + hh >= h - max(8, int(h * 0.05)) and area >= active_w * 3:
+                    seed_labels.add(label)
+        for label in seed_labels:
+            connected[labels == label] = 255
+
+        top_y = np.full(w, np.nan, dtype=np.float64)
+        for x in range(x_start, x_end + 1):
+            ys = np.flatnonzero(connected[y_min:y_max, x] > 0)
+            if len(ys):
+                top_y[x] = float(y_min + ys[0])
+
+        valid = np.isfinite(top_y[x_start:x_end + 1])
+        coverage = float(np.mean(valid)) if len(valid) else 0.0
+        if coverage < 0.12:
+            return np.full(w, h * 0.68, dtype=np.float64), 0.0
+
+        valid_x = np.flatnonzero(np.isfinite(top_y))
+        prior = np.interp(np.arange(w), valid_x, top_y[valid_x])
+        from scipy.ndimage import median_filter, uniform_filter1d
+        smooth_size = max(9, int(round(active_w * 0.025)) | 1)
+        prior = median_filter(prior, size=smooth_size, mode="nearest")
+        prior = uniform_filter1d(prior, size=max(3, smooth_size // 3), mode="nearest")
+
+        # Confidence juga memperhitungkan apakah massa bawah cukup luas.
+        area_ratio = float(np.count_nonzero(connected)) / float(max(1, active_w * h))
+        confidence = np.clip(0.65 * coverage + 0.35 * min(1.0, area_ratio / 0.12), 0.0, 1.0)
+        return prior.astype(np.float64), float(confidence)
+
+    def _classify_skyline_obstacle(
+        self,
+        x_start: int,
+        x_end: int,
+        tip_x: int,
+        tip_y: float,
+        horizon_y: np.ndarray,
+        detail_meta: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """Klasifikasi konservatif hanya untuk objek yang menyentuh skyline.
+
+        Ini bukan object detector seluruh foto. Label diturunkan dari geometri
+        profil dan ciri visual ROI lokal, sehingga nama tetap dapat dikoreksi
+        pengguna ketika kondisi lapangan ambigu.
+        """
+        image = self.last_image_bgr
+        if image is None or image.size == 0:
+            return {"class": "skyline_obstacle", "label": "Halangan Ufuk", "confidence": 0.35}
+
+        h, w = image.shape[:2]
+        xs = max(0, min(w - 1, int(x_start)))
+        xe = max(xs, min(w - 1, int(x_end)))
+        px = max(xs, min(xe, int(tip_x)))
+        py = max(0, min(h - 1, int(round(tip_y))))
+        width = max(1, xe - xs + 1)
+
+        detail_height = float((detail_meta or {}).get("height_px", 0.0))
+        if detail_height > 0:
+            base_y = min(h - 1, int(round(py + detail_height)))
+        else:
+            shoulder = max(4, min(40, width // 2 + 3))
+            samples = np.concatenate((
+                horizon_y[max(0, xs - shoulder):xs],
+                horizon_y[xe + 1:min(w, xe + shoulder + 1)],
+            ))
+            base_y = int(round(np.median(samples))) if len(samples) else int(round(np.max(horizon_y[xs:xe + 1])))
+            base_y = max(py + 1, min(h - 1, base_y))
+        height = max(1, base_y - py)
+        aspect = height / float(width)
+
+        # ROI diperluas agar kanopi di sekitar batang dan bidang atap di sekitar
+        # peak turut dinilai, tetapi tidak sampai mengklasifikasikan seluruh foto.
+        pad_x = max(6, min(int(w * 0.025), width * 2))
+        rx0, rx1 = max(0, xs - pad_x), min(w, xe + pad_x + 1)
+        ry0, ry1 = max(0, py - max(2, height // 10)), min(h, base_y + max(3, height // 8))
+        roi = image[ry0:ry1, rx0:rx1]
+        if roi.size == 0:
+            return {"class": "skyline_obstacle", "label": "Halangan Ufuk", "confidence": 0.35}
+
+        hsv = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
+        # Vegetasi hijau serta vegetasi gelap/desaturasi sedang.
+        green = cv2.inRange(hsv, np.array([25, 28, 20]), np.array([100, 255, 230]))
+        green_ratio = float(np.mean(green > 0))
+        gray_roi = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
+        lap_var = float(cv2.Laplacian(gray_roi, cv2.CV_32F).var())
+        edges = cv2.Canny(gray_roi, 50, 140)
+        edge_density = float(np.mean(edges > 0))
+
+        # Ukur dukungan massa gelap pada bagian tengah-bawah objek. Sebuah sisi
+        # gedung dapat terlihat ramping pada kontur, tetapi di bawahnya terdapat
+        # bidang bangunan yang lebar. Menara sejati tetap memiliki footprint
+        # sempit/berongga. Fitur ini mencegah setiap vertical detail dilabel menara.
+        upper_band_end = max(1, min(roi.shape[0], max(2, int(roi.shape[0] * 0.22))))
+        sky_level = float(np.median(gray_roi[:upper_band_end, :]))
+        lower_start = max(0, min(roi.shape[0] - 1, int(roi.shape[0] * 0.38)))
+        lower_gray = gray_roi[lower_start:, :]
+        dark_support = lower_gray < (sky_level - 9.0)
+        if dark_support.size:
+            supported_columns = np.mean(dark_support, axis=0) >= 0.32
+            support_ratio = float(np.mean(supported_columns))
+            solidity = float(np.mean(dark_support))
+        else:
+            support_ratio = 0.0
+            solidity = 0.0
+
+        sobel_x = np.abs(cv2.Sobel(gray_roi, cv2.CV_32F, 1, 0, ksize=3))
+        sobel_y = np.abs(cv2.Sobel(gray_roi, cv2.CV_32F, 0, 1, ksize=3))
+        horizontal_structure = float(np.mean(sobel_y)) / max(1.0, float(np.mean(sobel_x) + np.mean(sobel_y)))
+
+        # Garis arsitektural harus berupa segmen lurus yang nyata di dalam massa
+        # objek. Rasio Sobel saja tidak cukup karena batas bukit-langit juga
+        # menghasilkan respons horizontal yang kuat.
+        lower_edges = edges[lower_start:, :]
+        min_line_length = max(6, int(roi.shape[1] * 0.22))
+        lines = cv2.HoughLinesP(
+            lower_edges,
+            1,
+            np.pi / 180.0,
+            threshold=max(6, min_line_length // 2),
+            minLineLength=min_line_length,
+            maxLineGap=max(2, int(roi.shape[1] * 0.05)),
+        )
+        horizontal_lengths = []
+        vertical_lengths = []
+        if lines is not None:
+            for line in np.asarray(lines).reshape(-1, 4):
+                x1, y1, x2, y2 = (int(v) for v in line)
+                dx, dy = abs(x2 - x1), abs(y2 - y1)
+                length = float(np.hypot(dx, dy))
+                if dx >= min_line_length and dy <= max(2, int(dx * 0.16)):
+                    horizontal_lengths.append(length)
+                elif dy >= max(6, int(roi.shape[0] * 0.18)) and dx <= max(2, int(dy * 0.16)):
+                    vertical_lengths.append(length)
+        horizontal_line_count = len(horizontal_lengths)
+        horizontal_line_coverage = min(1.0, sum(horizontal_lengths) / max(1.0, roi.shape[1] * 2.0))
+        vertical_line_coverage = min(1.0, sum(vertical_lengths) / max(1.0, roi.shape[0] * 2.0))
+
+        # Ketidakteraturan kontur: vegetasi cenderung bergerigi; terrain halus.
+        segment = np.asarray(horizon_y[xs:xe + 1], dtype=np.float64)
+        if len(segment) >= 3:
+            roughness = float(np.median(np.abs(np.diff(segment, n=2))))
+        else:
+            roughness = 0.0
+
+        source = str((detail_meta or {}).get("source", "profile_peak"))
+        continuity = float((detail_meta or {}).get("continuity", 0.0) or 0.0)
+        contrast = float((detail_meta or {}).get("contrast", 0.0) or 0.0)
+        detail_confidence = float((detail_meta or {}).get("confidence", 0.0) or 0.0)
+
+        # Menara pada skyline perkotaan sering berdiri di balik gedung/pohon.
+        # Karena itu massa lebar di bawah batang tidak boleh membatalkan evidence
+        # geometri dari detector detail jika batangnya jelas tinggi dan ramping.
+        strong_slender_detail = (
+            source == "detail_vertical"
+            and aspect >= 2.4
+            and continuity >= 0.28
+            and detail_confidence >= 0.48
+        )
+        support_penalty = 1.0 if strong_slender_detail else (
+            1.0 - 0.65 * min(1.0, support_ratio / 0.58)
+        )
+
+        scores = {
+            "tower_antenna": 0.0,
+            "vegetation": 0.0,
+            "building_roof": 0.0,
+            "terrain": 0.0,
+        }
+
+        scores["vegetation"] = min(1.0,
+            0.62 * min(1.0, green_ratio / 0.24)
+            + 0.20 * min(1.0, lap_var / 700.0)
+            + 0.18 * min(1.0, roughness / 2.0)
+        )
+        scores["tower_antenna"] = min(1.0,
+            0.38 * min(1.0, aspect / 3.5)
+            + 0.22 * min(1.0, continuity / 0.65)
+            + 0.18 * min(1.0, contrast / 18.0)
+            + 0.14 * min(1.0, edge_density / 0.18)
+            + (0.08 if source == "detail_vertical" else 0.0)
+        ) * (1.0 - min(0.75, green_ratio * 1.8)) * support_penalty
+
+        # Bangunan/atap umumnya cukup lebar, bertepi jelas, dan tidak hijau.
+        broadness = min(1.0, width / max(12.0, w * 0.035))
+        low_aspect = 1.0 - min(1.0, aspect / 2.5)
+        scores["building_roof"] = min(1.0,
+            0.12 * broadness
+            + 0.12 * min(1.0, edge_density / 0.16)
+            + 0.08 * low_aspect
+            + 0.12 * min(1.0, support_ratio / 0.55)
+            + 0.10 * min(1.0, solidity / 0.48)
+            + 0.24 * horizontal_line_coverage
+            + 0.14 * vertical_line_coverage
+            + (0.08 if horizontal_line_count >= 2 else 0.0)
+        )
+
+        # Terrain adalah fallback untuk puncak lebar, halus, dan bukan kandidat
+        # struktur vertikal hasil detector detail.
+        smoothness = 1.0 - min(1.0, roughness / 1.8)
+        scores["terrain"] = min(1.0,
+            0.46 * broadness
+            + 0.34 * smoothness
+            + 0.20 * (1.0 - min(1.0, edge_density / 0.22))
+        ) * (0.55 if source == "detail_vertical" else 1.0)
+
+        class_key = max(scores, key=scores.get)
+        confidence = float(scores[class_key])
+        labels = {
+            "tower_antenna": "Menara/Antena",
+            "vegetation": "Vegetasi/Pohon",
+            "building_roof": "Bangunan/Atap",
+            "terrain": "Bukit/Terrain",
+        }
+        # Bidang solid lebar dengan garis horizontal kuat merupakan evidence
+        # bangunan yang lebih spesifik daripada fallback terrain. Ini menangani
+        # atap segitiga yang profil luarnya tampak seperti bukit kecil.
+        architectural_evidence = min(1.0,
+            0.20 * min(1.0, support_ratio / 0.55)
+            + 0.16 * min(1.0, solidity / 0.55)
+            + 0.32 * horizontal_line_coverage
+            + 0.20 * vertical_line_coverage
+            + (0.12 if horizontal_line_count >= 2 else 0.0)
+        ) * (1.0 - min(0.8, green_ratio * 2.0))
+        has_architectural_lines = (
+            horizontal_line_count >= 2
+            or (horizontal_line_coverage >= 0.32 and vertical_line_coverage >= 0.12)
+        )
+        if (
+            has_architectural_lines
+            and architectural_evidence >= 0.60
+            and class_key not in ("vegetation", "tower_antenna")
+        ):
+            class_key = "building_roof"
+            confidence = max(float(scores["building_roof"]), float(architectural_evidence))
+
+        # Bila seluruh evidence lemah, jangan membuat klaim spesifik.
+        # Klaim menara dibuat lebih ketat. Vertical edge pada gedung tidak cukup:
+        # harus benar-benar ramping, footprint tidak solid/lebar, dan skornya
+        # mengungguli bangunan dengan margin yang layak.
+        tower_rejected = (
+            aspect < 2.0
+            or (
+                not strong_slender_detail
+                and (
+                    support_ratio > 0.58
+                    or solidity > 0.52
+                    or scores["tower_antenna"] < scores["building_roof"] + 0.08
+                )
+            )
+        )
+        if class_key == "tower_antenna" and tower_rejected:
+            # Jangan otomatis mengubah kandidat menara yang gagal menjadi
+            # bangunan. Pilih ulang dari evidence yang benar-benar tersedia.
+            alternatives = {
+                "vegetation": scores["vegetation"],
+                "terrain": scores["terrain"],
+            }
+            if has_architectural_lines:
+                alternatives["building_roof"] = max(scores["building_roof"], architectural_evidence)
+            class_key = max(alternatives, key=alternatives.get)
+            confidence = float(alternatives[class_key])
+
+        if confidence < 0.44 or class_key == "skyline_obstacle":
+            class_key = "skyline_obstacle"
+            confidence = max(0.30, confidence)
+            label = "Halangan Ufuk"
+        else:
+            label = labels[class_key]
+        return {
+            "class": class_key,
+            "label": label,
+            "confidence": round(confidence, 3),
+            "features": {
+                "aspect_ratio": round(aspect, 3),
+                "green_ratio": round(green_ratio, 3),
+                "edge_density": round(edge_density, 3),
+                "texture": round(lap_var, 2),
+                "roughness": round(roughness, 3),
+                "support_ratio": round(support_ratio, 3),
+                "solidity": round(solidity, 3),
+                "horizontal_structure": round(horizontal_structure, 3),
+                "horizontal_line_count": horizontal_line_count,
+                "horizontal_line_coverage": round(horizontal_line_coverage, 3),
+                "vertical_line_coverage": round(vertical_line_coverage, 3),
+                "strong_slender_detail": strong_slender_detail,
+            },
+        }
 
     def preprocess_bw(self, image_bgr: np.ndarray) -> Dict[str, np.ndarray]:
         """
@@ -98,6 +634,7 @@ class HorizonDetector:
         h, w = image_bgr.shape[:2]
         if h < 20 or w < 20:
             raise ValueError("Dimensi gambar terlalu kecil untuk ekstraksi ufuk.")
+        self.last_image_bgr = image_bgr.copy()
 
         # Jalankan pra-pengolahan citra hitam-putih OpenCV
         bw_data = self.preprocess_bw(image_bgr)
@@ -120,6 +657,7 @@ class HorizonDetector:
             x_end = int(np.max(np.where(col_valid)[0]))
         else:
             x_start, x_end = 0, w - 1
+        self.last_active_bounds = (x_start, x_end)
 
         if method == self.METHOD_GRADIENT:
             # Algoritma Multi-Spectral OpenCV + Dynamic Programming (DP) Skyline Extraction
@@ -165,25 +703,37 @@ class HorizonDetector:
             # Fusi energi multi-spektral astronomis
             energy = 0.35 * e_l + 0.25 * e_gray + 0.25 * e_b + 0.15 * e_step
 
-            # Prioritas batas teratas (Zenith-to-Nadir Skyline Prior):
-            # Ufuk mar'i sejati adalah batas transisi pertama dari kubah langit terbuka ke daratan.
-            # Kontur/tepi objek di bawah batas pertama (atap bangunan foreground, ekskavator, jalan, pantulan air)
-            # ditekan secara eksponensial seiring bertambahnya energi kumulatif dari atas.
-            # ponytail: exponential decay rate 4.5; upgrade to sky semantic mask if dense cloud shadows mimic skyline
-            cum_energy = np.cumsum(energy, axis=0)
-            max_cum = np.maximum(cum_energy[-1:, :], 1e-4)
-            norm_cum = cum_energy / max_cum
-            zenith_weight = np.exp(-4.5 * (norm_cum ** 1.2))
-            energy_weighted = energy * zenith_weight
+            # Prior permukaan bawah menggantikan "edge pertama dari atas" yang
+            # mudah terkunci ke awan ekstrem. Awan boleh memiliki energi tinggi,
+            # tetapi mendapat penalti bila jauh di atas massa bottom-connected.
+            lower_prior, prior_confidence = self._estimate_bottom_connected_prior(
+                gray=gray,
+                y_min=y_min,
+                y_max=y_max,
+                x_start=x_start,
+                x_end=x_end,
+            )
 
             # 3. Normalisasi kolom dengan Global Floor untuk mencegah amplifikasi noise pada kolom berkabut
-            p99_e = float(np.percentile(energy_weighted[::2, ::2], 99.5))
+            p99_e = float(np.percentile(energy[::2, ::2], 99.5))
             global_floor = max(0.15 * p99_e, 1e-4)
-            col_max = np.maximum(np.max(energy_weighted, axis=0, keepdims=True), global_floor)
-            energy_norm = energy_weighted / col_max
+            col_max = np.maximum(np.max(energy, axis=0, keepdims=True), global_floor)
+            energy_norm = energy / col_max
 
-            cost = 1.0 - energy_norm
             roi_h = y_max - y_min
+            roi_rows = np.arange(y_min, y_max, dtype=np.float64)[:, None]
+            prior_roi = lower_prior[None, :]
+            # Ufuk laut dapat sedikit berada di atas daratan foreground. Zona
+            # toleransi 4.5% tinggi tidak dipenalti; awan yang jauh lebih tinggi
+            # menerima penalti progresif. Turun jauh di bawah massa dasar juga
+            # dipenalti agar jalur tidak memilih tekstur rumput/jalan.
+            free_above = max(8.0, h * 0.045)
+            free_below = max(4.0, h * 0.018)
+            too_high = np.maximum(0.0, prior_roi - roi_rows - free_above)
+            too_low = np.maximum(0.0, roi_rows - prior_roi - free_below)
+            position_penalty = too_high / max(12.0, h * 0.12) + too_low / max(10.0, h * 0.08)
+            prior_weight = 0.35 + 1.25 * prior_confidence
+            cost = 1.0 - energy_norm + prior_weight * position_penalty.astype(np.float32)
 
             dp = np.zeros((roi_h, w), dtype=np.float32)
             parent = np.zeros((roi_h, w), dtype=np.int32)
@@ -299,55 +849,18 @@ class HorizonDetector:
         else:
             horizon_y = raw_horizon_y
 
-        # Integrasi halangan vertikal ramping (menara BTS, SUTET, kubah, tiang antena)
-        # Menggunakan Filter Slender Prominence dengan Triple Acceptance Gate
+        # Jalur detail kedua: DP tetap menjaga bukit mulus, sedangkan struktur
+        # sempit dideteksi dari citra tajam dan digabung secara tervalidasi.
         try:
-            min_base = int(np.clip(np.min(horizon_y) - 8, y_min, y_max))
-            if min_base > y_min + 15:
-                sky_zone = gray[y_min:min_base, x_start:x_end+1]
-                sky_med = float(np.median(sky_zone))
-                # Ambang dijangkarkan ke median langit (menolak variasi rumbai awan)
-                sky_thresh = sky_med - 20.0
-
-                obs_mask = (gray < sky_thresh).astype(np.uint8) * 255
-                kernel_vert = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 13))
-                obs_closed = cv2.morphologyEx(obs_mask, cv2.MORPH_CLOSE, kernel_vert)
-
-                tower_y = np.copy(horizon_y)
-                for x in range(x_start, x_end + 1):
-                    b_idx = int(horizon_y[x])
-                    if b_idx >= h:
-                        continue
-                    col = obs_closed[:b_idx + 2, x]
-                    curr = b_idx
-                    while curr > y_min and col[curr] > 0:
-                        curr -= 1
-                    if curr < b_idx - 5:
-                        tower_y[x] = float(curr)
-
-                is_obstacle = (tower_y < horizon_y - 6)
-                jumps = np.where(is_obstacle)[0]
-                for _, g in groupby(enumerate(jumps), lambda ix: ix[0] - ix[1]):
-                    group = list(map(itemgetter(1), g))
-                    width = len(group)
-                    tip_y = np.min(tower_y[group])
-                    base_y = np.median(horizon_y[group])
-                    height = base_y - tip_y
-                    aspect = height / max(1.0, float(width))
-
-                    y_check = int(round(tip_y + min(4, height * 0.3)))
-                    x_l = max(0, group[0] - max(8, width))
-                    x_r = min(w - 1, group[-1] + max(8, width))
-                    sky_l = float(gray[y_check, x_l])
-                    sky_r = float(gray[y_check, x_r])
-                    tip_val = float(np.min(gray[y_check, group[0]:group[-1]+1]))
-                    contrast = min(sky_l, sky_r) - tip_val
-
-                    # Triple Gate: struktur fisik ramping dengan kontras nyata terhadap langit di kedua sisi
-                    if 2 <= width <= 32 and height >= 10 and aspect >= 1.25 and contrast >= 15.0:
-                        horizon_y[group] = tower_y[group]
+            horizon_y, self.last_detail_obstacles = self._detect_slender_obstacles(
+                image_bgr=image_bgr,
+                base_horizon=horizon_y,
+                x_start=x_start,
+                x_end=x_end,
+                y_min=y_min,
+            )
         except Exception:
-            pass
+            self.last_detail_obstacles = []
 
         # Buat mask biner tanah/halangan
         int_y = np.clip(np.round(horizon_y).astype(np.int32), 0, h - 1)
@@ -386,6 +899,9 @@ class HorizonDetector:
         elevations = np.asarray(el_raw, dtype=np.float64)
 
         # Baseline kalibrasi ufuk: tempatkan 0° tepat di garis dasar ufuk mar'i (garis merah)
+        # Referensi yang disengaja oleh instrumen: titik terendah profil pada
+        # foto dijadikan baseline relatif 0°. Nilai objek menyatakan tinggi
+        # sudut di atas baseline ufuk tersebut, bukan elevasi absolut geodetik.
         min_el = float(np.min(elevations))
         elevations = elevations - min_el
 
@@ -433,6 +949,9 @@ class HorizonDetector:
             "vfov": vfov,
             "tilt_center": tilt_center,
             "elevation_m": elevation_m,
+            "baseline_raw_elevation": min_el,
+            "elevation_reference": "minimum_horizon_profile",
+            "elevation_reference_label": "Titik terendah profil ufuk = 0°",
         }
 
     def detect_prominent_obstacles(
@@ -442,7 +961,7 @@ class HorizonDetector:
         horizon_y: np.ndarray,
         img_w: int,
         img_h: int,
-        min_prominence: float = 0.10,
+        min_prominence: float = 0.05,
         max_peaks: Optional[int] = None,
     ) -> List[Dict[str, Any]]:
         """
@@ -461,11 +980,11 @@ class HorizonDetector:
         """
         from scipy.signal import find_peaks
 
-        min_dist = max(15, img_w // 28)
+        # Jarak lama img_w//28 (~45 px pada 1280 px) membuang menara yang
+        # berdekatan. Kandidat detail tetap akan dideduplikasi berdasarkan
+        # rentang objek, bukan dibuang hanya berdasarkan jarak puncak.
+        min_dist = max(5, img_w // 100)
         peaks, props = find_peaks(elevations, prominence=min_prominence, distance=min_dist)
-
-        if len(peaks) == 0:
-            return []
 
         proms = props.get("prominences", np.zeros(len(peaks)))
         left_bases = props.get("left_bases", peaks)
@@ -478,12 +997,47 @@ class HorizonDetector:
         else:
             top_peaks = sorted(peaks)
 
+        # Tambahkan kandidat dari detector citra, termasuk endpoint yang tidak
+        # mungkin ditemukan oleh scipy.find_peaks. Kandidat yang overlap dengan
+        # peak profil akan memakai metadata detail tanpa membuat label ganda.
+        detail_candidates = list(self.last_detail_obstacles or [])
+        combined_peaks = list(top_peaks)
+        for detail_obs in detail_candidates:
+            dx = int(detail_obs.get("x", -1))
+            ds = int(detail_obs.get("x_start", dx))
+            de = int(detail_obs.get("x_end", dx))
+            if dx < 0 or dx >= len(elevations):
+                continue
+            overlapping = [int(px) for px in combined_peaks if ds - 2 <= int(px) <= de + 2]
+            # Satu struktur dapat menghasilkan beberapa puncak kecil pada kisi.
+            # Pertahankan hanya puncak tertinggi agar label objek tidak ganda.
+            if overlapping:
+                best = max(overlapping, key=lambda px: float(elevations[px]))
+                combined_peaks = [px for px in combined_peaks if px not in overlapping or px == best]
+            else:
+                combined_peaks.append(dx)
+        combined_peaks = sorted(set(combined_peaks))
+
         n = len(elevations)
         obstacles = []
-        for i, px in enumerate(top_peaks):
+        for i, px in enumerate(combined_peaks):
             pos = np.where(peaks == px)[0]
-            pi = int(pos[0]) if len(pos) > 0 else 0
-            prom_val = float(proms[pi]) if len(pos) > 0 else 0.0
+            pi = int(pos[0]) if len(pos) > 0 else -1
+            matching_detail = next((
+                item for item in detail_candidates
+                if int(item.get("x_start", item.get("x", -1))) - 2 <= px
+                <= int(item.get("x_end", item.get("x", -1))) + 2
+            ), None)
+            if pi >= 0:
+                prom_val = float(proms[pi])
+            elif matching_detail is not None:
+                ds = max(0, int(matching_detail.get("x_start", px)) - 3)
+                de = min(n - 1, int(matching_detail.get("x_end", px)) + 3)
+                neighbors = np.concatenate((elevations[ds:px], elevations[px + 1:de + 1]))
+                local_base = float(np.median(neighbors)) if len(neighbors) else 0.0
+                prom_val = max(0.0, float(elevations[px]) - local_base)
+            else:
+                prom_val = 0.0
             py = float(horizon_y[px])
             az = float(azimuths[px])
             alt = float(elevations[px])
@@ -491,8 +1045,12 @@ class HorizonDetector:
             # --- LEBAR OBJEK ---
             # Mulai dari kaki prominensi, lalu dipersempit memakai ambang 12% tinggi
             # prominensi agar lebar mengikuti bentuk objek (bukan seluruh lereng).
-            x_start = int(left_bases[pi]) if len(pos) > 0 else int(px)
-            x_end = int(right_bases[pi]) if len(pos) > 0 else int(px)
+            if matching_detail is not None:
+                x_start = int(matching_detail.get("x_start", px))
+                x_end = int(matching_detail.get("x_end", px))
+            else:
+                x_start = int(left_bases[pi]) if pi >= 0 else int(px)
+                x_end = int(right_bases[pi]) if pi >= 0 else int(px)
             x_start = max(0, min(n - 1, x_start))
             x_end = max(0, min(n - 1, x_end))
 
@@ -511,10 +1069,10 @@ class HorizonDetector:
             # Cegah rentang antar objek bertumpuk: batasi sampai titik tengah
             # antara puncak ini dengan puncak tetangga terdekat.
             if i > 0:
-                mid_left = int(round((top_peaks[i - 1] + px) / 2.0))
+                mid_left = int(round((combined_peaks[i - 1] + px) / 2.0))
                 x_start = max(x_start, mid_left)
-            if i < len(top_peaks) - 1:
-                mid_right = int(round((px + top_peaks[i + 1]) / 2.0))
+            if i < len(combined_peaks) - 1:
+                mid_right = int(round((px + combined_peaks[i + 1]) / 2.0))
                 x_end = min(x_end, mid_right)
 
             x_start = max(0, min(n - 1, x_start))
@@ -529,6 +1087,17 @@ class HorizonDetector:
             if az_start > az_end:
                 az_start, az_end = az_end, az_start
 
+            classification = self._classify_skyline_obstacle(
+                x_start=x_start,
+                x_end=x_end,
+                tip_x=int(px),
+                tip_y=py,
+                horizon_y=horizon_y,
+                detail_meta=matching_detail,
+            )
+            auto_label = classification["label"]
+            class_confidence = float(classification["confidence"])
+
             obstacles.append({
                 "id": i + 1,
                 "x": int(px),
@@ -541,8 +1110,17 @@ class HorizonDetector:
                 "az_span": round(abs(az_end - az_start), 2),
                 "elevation": round(alt, 2),
                 "prominence": round(prom_val, 2),
-                "label": f"Objek {i + 1}",
-                "text": f"Objek {i + 1}: Az {az_start:.2f}-{az_end:.2f} deg | Alt {alt:+.2f} deg",
+                "confidence": float(matching_detail.get("confidence", 0.0)) if matching_detail else None,
+                "continuity": float(matching_detail.get("continuity", 0.0)) if matching_detail else None,
+                "contrast": float(matching_detail.get("contrast", 0.0)) if matching_detail else None,
+                "is_endpoint": bool(matching_detail.get("is_endpoint", False)) if matching_detail else False,
+                "source": matching_detail.get("source", "profile_peak") if matching_detail else "profile_peak",
+                "object_class": classification["class"],
+                "classification_confidence": class_confidence,
+                "classification_features": classification["features"],
+                "auto_label": auto_label,
+                "label": auto_label,
+                "text": f"{auto_label}: Az {az_start:.2f}-{az_end:.2f} deg | Alt {alt:+.2f} deg",
                 "short_text": f"Az {az_start:.2f}°-{az_end:.2f}°, Alt {alt:+.2f}°",
             })
         return obstacles

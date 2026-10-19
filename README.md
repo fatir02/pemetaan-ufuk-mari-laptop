@@ -51,7 +51,8 @@ Ketinggian halangan ($Alt$) pada azimut sasaran diklasifikasikan berdasarkan kri
 
 ```
 pemetaan-ufuk-mari/
-├── main.py                     # Titik masuk utama aplikasi (QApplication)
+├── main.py                     # Titik masuk UI web terbaru, sama seperti EXE
+├── legacy_desktop.py           # Launcher UI PyQt lama (opsional)
 ├── test_app.py                 # Skrip pengujian otomatis seluruh alur
 ├── requirements.txt            # Daftar pustaka dependensi Python
 ├── README.md                   # Dokumentasi ilmiah & teknis aplikasi
@@ -61,7 +62,15 @@ pemetaan-ufuk-mari/
 │   ├── camera_worker.py        # Worker streaming kamera USB asinkron
 │   ├── sample_generator.py     # Generator citra lanskap senja sintetis
 │   └── report_generator.py     # Generator dokumen resmi PDF & ekspor CSV
-├── ui/                         # Antarmuka Pengguna (UI)
+├── web/                        # Template UI web (dipisah per fungsi)
+│   ├── templates/
+│   │   ├── app.html            # Kerangka halaman & manifest include
+│   │   ├── app.js              # Manifest modul JavaScript
+│   │   ├── css/app.css         # Seluruh gaya visual
+│   │   ├── partials/           # Potongan HTML: header, wizard, modal
+│   │   └── js/                 # Modul JS: core, foto, objek, editor, kamera,
+│   │                           # sensor, wizard, analisis, laporan, interaktif
+├── ui/                         # Antarmuka Pengguna (UI) PyQt lama
 │   ├── main_window.py          # Window utama & pengontrol stepper 4 layar
 │   ├── styles.py               # Tema visual dark modern (QSS)
 │   ├── screens/                # Alur 4 Layar (Mudah Dibaca & Diedit)
@@ -94,27 +103,36 @@ pip install -r requirements.txt
 python3 main.py
 ```
 
+Perintah tersebut menjalankan UI web terbaru dalam jendela native embedded
+WebView, tanpa membuka Google Chrome/Chromium. Di macOS/Hackintosh digunakan
+WKWebView/WebKit bawaan sistem, sedangkan Windows memakai WebView2. Untuk membuka UI PyQt lama secara eksplisit gunakan
+`python3 legacy_desktop.py`.
+
 ---
 
-## 🖥️ 5. Alur Kerja Aplikasi (4 Tahap Streamlined)
+## 🖥️ 5. Alur Kerja Aplikasi (Wizard 4 Langkah)
 
-1. **Tahap 1 - Beranda (Dashboard):**
-   - Tampilan bersih dan elegan dengan tombol utama: `[MULAI PENGAMATAN]`.
+UI web/EXE memakai wizard bertahap: hanya satu kelompok data tampil pada satu waktu,
+dengan stepper di atas dan tombol navigasi yang selalu terlihat di bawah.
 
-2. **Tahap 2 - Pengamatan (Kamera & Sensor):**
-   - Viewfinder kamera live / upload foto dengan overlay crosshair di tengah.
-   - HUD Sensor otomatis: Indikator hijau saat mengarah tepat ke Barat (`270.0°`), sudut elevasi, dan koordinat GPS.
-   - Tombol shutter frame atau pilih dari file/galeri dengan strip preview maksimal 3 foto.
-   - Klik `[PROSES & LIHAT HASIL]` untuk ekstraksi kontur otomatis.
+1. **Langkah 1 - Input Citra:**
+   - Ambil gambar dari kamera atau pilih berkas, maksimal 3 slot foto.
+   - Tombol `Lanjut: Parameter` membuka langkah berikutnya.
 
-3. **Tahap 3 - Hasil & Profil Ufuk:**
-   - Tampilan gabungan satu layar: Foto kontur ufuk + Data numerik + Kurva visual profil ufuk (Matplotlib).
+2. **Langkah 2 - Parameter Bidikan:**
+   - Azimut bidikan, kemiringan/elevasi, koordinat lokasi, dan tinggi alat.
+   - Tombol `Proses & Lanjut` menjalankan ekstraksi kontur lalu pindah ke hasil.
+   - Kamera fisik menjadi default; backend native Windows, macOS, atau Linux dan indeks perangkat dicoba otomatis. Status FPS maupun pesan izin/perangkat yang gagal tampil langsung di layar.
+   - Aplikasi memilih kamera berdasarkan kemampuan mengirim frame, bukan hanya karena perangkat terdeteksi. Jika kamera pilihan tidak mengirim gambar, aplikasi otomatis beralih ke kamera lain dan menampilkan pemberitahuan. Pesan kesalahan membedakan izin ditolak, perangkat tidak terbaca, dan perangkat terdeteksi tetapi tidak mengirim frame.
+
+3. **Langkah 3 - Hasil & Profil Ufuk:**
+   - Foto kontur ufuk dan kurva elevasi relatif vs azimut.
+   - Viewer fullscreen berbasis foto mentah dan SVG vektor: zoom roda/pinch, pan, fokus kartu objek, popup marker, Pen Tool bebas, tambah anchor, tambah objek manual, dan resize kedua ujung penanda H. Koreksi disimpan kembali ke overlay, grafik, kartu objek, serta laporan.
    - Slider inspeksi azimut sasaran hilal untuk evaluasi sudut halangan.
-   - Tombol `[Foto Ulang]` (jika ingin kembali ke kamera) atau `[Lanjut ke Cetak Laporan]`.
 
-4. **Tahap 4 - Laporan PDF Resmi:**
+4. **Langkah 4 - Laporan PDF Resmi:**
    - Form catatan evaluasi terisi otomatis dengan rekomendasi falak.
-   - Tombol `[CETAK LAPORAN RESMI (PDF)]` untuk menghasilkan dokumen berita acara siap cetak di folder `exports/`.
+   - `Preview Laporan PDF` menghasilkan dokumen berita acara siap cetak di folder `exports/`.
 
 ### Modul 1: Profil Ufuk (Pengambilan & Plotting)
 1. **Live Streaming Kamera USB:** Pilih sumber kamera USB (misal `/dev/video0`) atau gunakan *Mode Simulasi Falak*. Klik **Mulai Kamera**.
@@ -152,6 +170,34 @@ python3 main.py
    - Menggunakan validasi kontras horizontal terhadap langit di samping kiri dan kanan struktur (`contrast >= 10.0`), memastikan lonjakan palsu (*false spikes*) akibat variasi gradasi awan mendung atau punggungan pegunungan tertolak 100%.
 4. **Penyempurnaan Render Overlay Citra:**
    - Menambahkan resolusi otomatis indeks kolom horizontal `target_x` pada fungsi `render_overlay` untuk sinkronisasi retikel target dan anotasi derajat falak.
+
+5. **Deteksi Detail Menara, Antena, dan Objek di Ujung Citra:**
+
+   - Memisahkan jalur kontur utama yang halus dari jalur detail struktur vertikal agar objek ramping tidak dianggap noise oleh Dynamic Programming.
+
+   - Menggunakan ROI adaptif di atas garis ufuk, toleransi gap untuk menara kisi, validasi kontras lokal, kontinuitas vertikal, aspect ratio, dan confidence score.
+
+   - Menambahkan deteksi satu sisi pada batas aktif kiri/kanan sehingga objek yang berada tepat di ujung foto tetap dapat dilaporkan.
+
+   - Titik terendah profil tetap sengaja ditetapkan sebagai baseline relatif `0°`; elevasi objek menyatakan tinggi sudut di atas baseline tersebut.
+
+6. **Klasifikasi Otomatis Halangan Skyline:**
+
+   - Kandidat yang bersinggungan dengan garis ufuk diberi label awal konservatif: `Menara/Antena`, `Vegetasi/Pohon`, `Bangunan/Atap`, `Bukit/Terrain`, atau `Halangan Ufuk` jika bukti visual belum cukup kuat.
+
+   - Klasifikasi menggabungkan geometri kontur, aspect ratio, warna vegetasi, tekstur, kepadatan tepi, dan metadata struktur vertikal. Confidence digunakan secara internal dan nama tetap dapat dikoreksi manual oleh pengamat.
+
+   - Pada aplikasi desktop PyQt, editor nama tersedia di Layar Hasil pada kartu **OBJEK HALANGAN SKYLINE**. Perubahan nama langsung memperbarui overlay dan ikut diteruskan ke laporan PDF.
+
+   - Gambar kontur pada sisi kiri Layar Hasil dapat diklik untuk membuka viewer fullscreen. Gunakan roda mouse atau cubit trackpad untuk zoom, drag atau gestur dua jari untuk menggeser gambar, klik dua kali untuk memperbesar titik yang diklik, tombol **Sesuaikan Layar** untuk reset, dan `Esc` untuk menutup.
+
+   - Rentang azimut pada kartu objek dapat diklik untuk membuka viewer fullscreen yang langsung diperbesar dan dipusatkan pada objek terkait.
+
+   - Dalam fokus objek, hanya kontur pada rentang azimut terpilih yang berwarna merah; kontur lain ditampilkan abu-abu tipis. Garis dirender sebagai layer vektor dan semakin tipis saat zoom agar detail menara atau antena tidak tertutup.
+
+   - Rendering adaptif tersebut berlaku pada seluruh mode fullscreen, termasuk ketika gambar utama diklik tanpa memilih objek. Kontur, meridian azimut, dan penanda rentang objek tidak ditanam pada bitmap sehingga semuanya menipis ketika diperbesar.
+
+   - Toolbar fullscreen menyediakan **Navigasi**, **Edit Garis**, dan **Tambah Objek**. Mode Edit Garis memakai pendekatan Pen Tool: titik jangkar otomatis muncul pada sudut/perubahan arah kontur, dapat ditarik bebas horizontal maupun vertikal, dan anchor baru dapat ditambahkan dengan klik pada garis. Handle di kedua ujung penanda berbentuk H dapat ditarik untuk memperkecil atau memperlebar rentang objek. Mode Tambah Objek memasukkan halangan yang terlewat melalui pilihan jenis manual. Pada mode Navigasi, klik marker menampilkan nama, azimut, dan elevasi objek.
 
 ### B. `web_app.py` (Pembaruan Antarmuka Web Interaktif)
 1. **Viewport Citra Interaktif dengan Zoom & Pan:**
