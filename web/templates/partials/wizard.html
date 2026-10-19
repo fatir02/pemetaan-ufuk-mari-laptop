@@ -241,7 +241,7 @@
       </div>
 
       <!-- HASIL OLAH & KURVA PROFIL -->
-      <div id="resultSection" style="display: none;">
+      <div id="resultSection" class="result-layout" style="display: none;">
         <div class="card visual-card">
           <div class="card-title" style="flex-wrap: wrap; gap: 8px;">
             <div style="display: flex; align-items: center; gap: 8px;">
@@ -264,25 +264,10 @@
               <span>Klik atau seret pada citra untuk mengarahkan titik azimut sasaran</span>
             </div>
           </div>
-
-          <!-- POP UP / CHIPS OBJEK MENONJOL (ANGKA DERAJAT HORIZONTAL & VERTIKAL) -->
-          <div id="prominentObjectsContainer" class="prominent-objects-panel" style="display: none;">
-            <div class="prominent-objects-header">
-              <span class="prominent-title">Objek Terdeteksi:</span>
-              <span class="prominent-sub">Ubah nama objek sesuai pengamatan, lalu klik Terapkan</span>
-            </div>
-            <div id="prominentObjectsList" class="prominent-objects-list"></div>
-            <div style="margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
-              <button type="button" class="btn btn-primary btn-sm" style="width: auto;" onclick="applyObjectNames()">
-                Terapkan Nama ke Gambar
-              </button>
-              <span id="lblRenameStatus" style="font-size: 0.74rem; color: #94a3b8;"></span>
-            </div>
-          </div>
         </div>
 
         <!-- KURVA PROFIL ELEVASI VS AZIMUTH (DENGAN SLIDER ATUR SASARAN LANGSUNG DI DALAM FRAME) -->
-        <div class="card visual-card" style="margin-bottom: 14px;">
+        <div class="card visual-card">
           <div class="card-title">
             <span>4. Grafik Elevasi vs Azimut</span>
             <span style="font-size: 0.78rem; color: #38bdf8; font-weight: normal;">Klik kurva untuk mengatur azimut sasaran</span>
@@ -291,17 +276,32 @@
             <img id="resPlotImg" style="width: 100%; max-height: 400px; object-fit: contain; display: block; user-select: none;" alt="Grafik Profil Elevasi vs Azimuth" draggable="false">
           </div>
 
-          <div class="slider-container" style="margin-top: 12px; padding: 10px 14px; background: #0f172a; border: 1px solid #1e293b; border-radius: 8px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-              <label style="margin: 0; font-size: 0.82rem; color: #cbd5e1; font-weight: 600;">Titik Azimut Sasaran:</label>
-              <b id="lblSliderAz" style="color: #38bdf8; font-size: 1.05rem; background: #020617; padding: 2px 10px; border-radius: 6px; border: 1px solid #334155;">270.00°</b>
+          <div class="slider-container" style="margin-top: 8px; padding: 8px 12px; background: #0f172a; border: 1px solid #1e293b; border-radius: 8px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+              <label style="margin: 0; font-size: 0.78rem; color: #cbd5e1; font-weight: 600;">Titik Azimut Sasaran:</label>
+              <b id="lblSliderAz" style="color: #38bdf8; font-size: 0.95rem; background: #020617; padding: 1px 8px; border-radius: 6px; border: 1px solid #334155;">270.00°</b>
             </div>
             <input type="range" id="sliderAz" min="240.0" max="300.0" step="0.05" value="270.0" oninput="onSliderTargetChanged(this.value)">
-            <div style="display: flex; justify-content: space-between; font-size: 0.72rem; color: #64748b; margin-top: 4px;">
+            <div style="display: flex; justify-content: space-between; font-size: 0.7rem; color: #64748b; margin-top: 2px;">
               <span id="lblMinAz">240.0°</span>
               <span>Tengah (Barat)</span>
               <span id="lblMaxAz">300.0°</span>
             </div>
+          </div>
+        </div>
+
+        <!-- DAFTAR OBJEK TERDETEKSI (NAMA & SUDUT) -->
+        <div id="prominentObjectsContainer" class="prominent-objects-panel" style="display: none;">
+          <div class="prominent-objects-header">
+            <span class="prominent-title">Objek Terdeteksi <span class="prominent-count" id="prominentCount">0</span></span>
+            <span class="prominent-sub">Ubah nama sesuai pengamatan, klik kartu untuk membuka editor</span>
+          </div>
+          <div id="prominentObjectsList" class="prominent-objects-list"></div>
+          <div class="prominent-actions">
+            <button type="button" class="btn btn-primary btn-sm" style="width: auto;" onclick="applyObjectNames()">
+              Terapkan Nama ke Gambar
+            </button>
+            <span id="lblRenameStatus" style="font-size: 0.74rem; color: #94a3b8;"></span>
           </div>
         </div>
 

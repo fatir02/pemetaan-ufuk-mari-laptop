@@ -269,19 +269,19 @@
       font-weight: 700;
     }
 
-    /* Prominent Objects Pop-up Panel */
+    /* Panel Objek Terdeteksi */
     .prominent-objects-panel {
-      margin-top: 12px;
+      margin-top: 0;
       background: #0f172a;
       border: 1px solid #233147;
       border-radius: 12px;
-      padding: 12px 14px;
+      padding: 10px 12px;
     }
     .prominent-objects-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 10px;
+      margin-bottom: 8px;
       flex-wrap: wrap;
       gap: 6px;
     }
@@ -293,56 +293,81 @@
       align-items: center;
       gap: 6px;
     }
+    .prominent-count {
+      background: #1e293b;
+      border: 1px solid #334155;
+      color: #94a3b8;
+      border-radius: 20px;
+      padding: 1px 8px;
+      font-size: 0.7rem;
+      font-weight: 700;
+    }
     .prominent-sub {
       font-size: 0.72rem;
       color: #94a3b8;
     }
     .prominent-objects-list {
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+      gap: 6px;
+      max-height: 84px;
+      overflow-y: auto;
+      padding-right: 2px;
     }
+    .prominent-objects-list::-webkit-scrollbar { width: 7px; }
+    .prominent-objects-list::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 4px;
+    }
+    .prominent-objects-list::-webkit-scrollbar-thumb:hover { background: #475569; }
     .prominent-chip {
-      background: #1e293b;
-      border: 1px solid #334155;
+      background: #162033;
+      border: 1px solid #2b3a52;
       border-radius: 8px;
-      padding: 6px 12px;
+      padding: 6px 8px;
       color: #e2e8f0;
-      font-size: 0.76rem;
+      font-size: 0.74rem;
       cursor: pointer;
-      display: inline-flex;
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      grid-template-areas:
+        "badge name aim"
+        "angles angles angles";
       align-items: center;
-      gap: 8px;
-      transition: all 0.15s ease;
+      gap: 4px 6px;
+      transition: border-color 0.15s ease, background 0.15s ease;
+      min-width: 0;
     }
     .prominent-chip:hover {
-      background: #273549;
+      background: #1b2739;
       border-color: #38bdf8;
-      color: #ffffff;
-      transform: translateY(-1px);
     }
     .prominent-chip.chip-active {
-      background: rgba(2, 132, 199, 0.25);
+      background: rgba(2, 132, 199, 0.18);
       border-color: #38bdf8;
-      box-shadow: 0 0 8px rgba(56, 189, 248, 0.3);
+      box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.35);
     }
     .chip-badge {
+      grid-area: badge;
       background: #0284c7;
       color: #ffffff;
-      padding: 2px 6px;
-      border-radius: 4px;
+      padding: 1px 6px;
+      border-radius: 5px;
       font-weight: 700;
-      font-size: 0.68rem;
+      font-size: 0.66rem;
+      white-space: nowrap;
     }
     .chip-name-input {
+      grid-area: name;
       background: #0b1220;
       border: 1px solid #334155;
-      border-radius: 5px;
+      border-radius: 6px;
       color: #ffffff;
-      font-size: 0.76rem;
+      font-size: 0.74rem;
       font-weight: 600;
       padding: 3px 7px;
-      width: 120px;
+      width: 100%;
+      min-width: 0;
       outline: none;
       font-family: inherit;
     }
@@ -351,23 +376,60 @@
       box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.18);
     }
     .chip-aim {
-      background: #0284c7;
-      border: none;
-      border-radius: 5px;
-      color: #ffffff;
+      grid-area: aim;
+      background: #1e3a5f;
+      border: 1px solid #2f5f8f;
+      border-radius: 6px;
+      color: #93c5fd;
       font-size: 0.68rem;
       font-weight: 700;
-      padding: 4px 8px;
+      padding: 4px 9px;
       cursor: pointer;
       white-space: nowrap;
+      font-family: inherit;
     }
-    .chip-aim:hover { background: #0369a1; }
+    .chip-aim:hover { background: #0284c7; border-color: #38bdf8; color: #ffffff; }
     .chip-angles {
+      grid-area: angles;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
       font-family: monospace;
-      font-size: 0.78rem;
+      font-size: 0.68rem;
+      color: #7c8da6;
+      border-top: 1px solid #22304a;
+      padding-top: 3px;
     }
     .chip-angles b {
       color: #38bdf8;
+      font-weight: 700;
+    }
+    .chip-angle-label {
+      color: #64748b;
+      font-family: inherit;
+      font-size: 0.68rem;
+    }
+    .prominent-actions {
+      margin-top: 8px;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    /* Tata letak Langkah 3: citra & grafik berdampingan, objek di bawah */
+    .result-layout {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 14px;
+    }
+    .result-layout > .prominent-objects-panel { margin-top: 0; }
+    @media (min-width: 992px) {
+      .result-layout {
+        grid-template-columns: 1.05fr 0.95fr;
+        align-items: start;
+      }
+      .result-layout > .prominent-objects-panel { grid-column: 1 / -1; }
     }
     .badge {
       display: inline-block; padding: 4px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: bold;
@@ -387,7 +449,7 @@
       touch-action: none;
       user-select: none;
       cursor: crosshair;
-      min-height: 420px;
+      min-height: 220px;
       max-height: 640px;
       display: flex;
       align-items: center;
@@ -741,6 +803,9 @@
         grid-template-columns: 1fr 1fr;
       }
       .result-img-interactive {
-        max-height: 580px;
+        max-height: 255px;
+      }
+      #resPlotImg {
+        max-height: 180px !important;
       }
     }

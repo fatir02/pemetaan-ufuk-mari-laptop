@@ -16,6 +16,9 @@ function renderProminentObjects(objects) {
   list.innerHTML = '';
   window.__prominentObjectsData = objects;
 
+  const countEl = document.getElementById('prominentCount');
+  if (countEl) countEl.textContent = String(objects.length);
+
   objects.forEach((obj, idx) => {
     const key = String(idx + 1);
     const savedName = prominentObjectNames[key];
@@ -25,6 +28,7 @@ function renderProminentObjects(objects) {
     chip.className = 'prominent-chip';
     chip.dataset.az = obj.azimuth.toFixed(2);
     chip.dataset.idx = key;
+    chip.title = 'Klik untuk membuka editor kontur pada objek ini';
     chip.onclick = () => openSkylineEditor(idx);
 
     const badge = document.createElement('span');
@@ -58,20 +62,25 @@ function renderProminentObjects(objects) {
       scheduleAutoApply(120);
     };
 
-    const angles = document.createElement('span');
-    angles.className = 'chip-angles';
     const azStart = (typeof obj.az_start === 'number') ? obj.az_start : obj.azimuth;
     const azEnd = (typeof obj.az_end === 'number') ? obj.az_end : obj.azimuth;
     const hasSpan = (typeof obj.az_span === 'number') && obj.az_span > 0.05;
     const azText = hasSpan
-      ? `${azStart.toFixed(2)}° – ${azEnd.toFixed(2)}°`
-      : `${obj.azimuth.toFixed(2)}°`;
-    angles.innerHTML = `H (Az): <b>${azText}</b> | V (Alt): <b>${(obj.elevation >= 0 ? '+' : '') + obj.elevation.toFixed(2)}°</b>`;
+      ? `${azStart.toFixed(1)}°–${azEnd.toFixed(1)}°`
+      : `${obj.azimuth.toFixed(1)}°`;
+    const elText = (obj.elevation >= 0 ? '+' : '') + obj.elevation.toFixed(2) + '°';
+
+    const angles = document.createElement('span');
+    angles.className = 'chip-angles';
+    angles.innerHTML =
+      `<span><span class="chip-angle-label">Az</span> <b>${azText}</b></span>` +
+      `<span><span class="chip-angle-label">Alt</span> <b>${elText}</b></span>`;
 
     const aimBtn = document.createElement('button');
     aimBtn.type = 'button';
     aimBtn.className = 'chip-aim';
     aimBtn.textContent = 'Bidik';
+    aimBtn.title = 'Arahkan penanda azimut ke objek ini';
     aimBtn.onclick = (e) => {
       e.stopPropagation();
       jumpToAzimuth(obj.azimuth);
@@ -79,8 +88,8 @@ function renderProminentObjects(objects) {
 
     chip.appendChild(badge);
     chip.appendChild(nameInput);
-    chip.appendChild(angles);
     chip.appendChild(aimBtn);
+    chip.appendChild(angles);
     list.appendChild(chip);
   });
 }

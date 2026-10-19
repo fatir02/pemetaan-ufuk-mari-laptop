@@ -91,7 +91,7 @@ function processImage() {
     if (document.getElementById('rightPlaceholder')) {
       document.getElementById('rightPlaceholder').style.display = 'none';
     }
-    document.getElementById('resultSection').style.display = 'block';
+    document.getElementById('resultSection').style.display = 'grid';
     goToStep(3);
   })
   .catch(err => {
