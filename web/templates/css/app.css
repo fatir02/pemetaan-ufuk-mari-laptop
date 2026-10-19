@@ -609,7 +609,24 @@
     #skylineEditorSvg .span-handle { fill: #38bdf8; stroke: #fff; cursor: ew-resize; }
     #skylineEditorSvg .target-line { stroke: #ef4444; opacity: .72; }
     #skylineEditorSvg .vector-line { vector-effect: non-scaling-stroke; }
-    #skylineTooltip { position: absolute; display: none; z-index: 4; pointer-events: none; background: rgba(15,23,42,.96); border: 1px solid #475569; border-radius: 8px; color: #f8fafc; padding: 7px 10px; font-size: .76rem; box-shadow: 0 6px 18px rgba(0,0,0,.45); }
+    #skylineTooltip {
+      position: absolute;
+      display: none;
+      z-index: 6;
+      pointer-events: none;
+      background: rgba(15, 23, 42, .96);
+      border: 1px solid #475569;
+      border-radius: 8px;
+      color: #f8fafc;
+      padding: 6px 10px;
+      font-size: .76rem;
+      line-height: 1.35;
+      box-shadow: 0 6px 18px rgba(0, 0, 0, .45);
+      max-width: 210px;
+      white-space: nowrap;
+    }
+    #skylineTooltip b { display: block; color: #38bdf8; font-size: .8rem; }
+    #skylineTooltip span { display: block; color: #cbd5e1; font-size: .72rem; font-family: monospace; }
     .sky-editor-status { color: #94a3b8; font-size: .74rem; }
 
     /* Stats Cards */

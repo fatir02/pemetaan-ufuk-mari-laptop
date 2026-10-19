@@ -270,7 +270,7 @@ def fast_render_plot_image(azimuths, elevations, dip_deg, target_az=None, target
     fig, ax = plt.subplots(figsize=(8.0, 3.4), dpi=120)
     fig.patch.set_facecolor("#0f172a")
     ax.set_facecolor("#020617")
-    fig.subplots_adjust(left=0.13, right=0.96, top=0.88, bottom=0.15)
+    fig.subplots_adjust(left=0.115, right=0.975, top=0.87, bottom=0.17)
 
     az_arr = np.asarray(azimuths)
     el_arr = np.asarray(elevations)
@@ -287,14 +287,25 @@ def fast_render_plot_image(azimuths, elevations, dip_deg, target_az=None, target
         ax.axvline(target_az, color=c_target, linestyle="-.", linewidth=1.5, label=f"Azimut Sasaran ({target_az:.2f}°)")
         ax.scatter([target_az], [t_alt], color=c_target, s=60, zorder=5)
         ax.scatter([target_az], [t_alt], color="#ffffff", s=20, zorder=6)
+        # Tempatkan label di sisi berlawanan dari garis agar tidak menutupi
+        # kurva dan tidak terpotong tepi grafik.
+        az_min_view = float(az_arr[0])
+        az_max_view = float(az_arr[-1])
+        span_view = max(1e-6, az_max_view - az_min_view)
+        to_right = (target_az - az_min_view) < span_view * 0.5
+        dx = span_view * 0.035 * (1 if to_right else -1)
         ax.annotate(
             f"Halangan: {t_alt:+.2f}°",
             xy=(target_az, t_alt),
-            xytext=(target_az + 0.35, t_alt + 0.5),
+            xytext=(target_az + dx, t_alt + 0.9),
             fontsize=8,
             fontweight="bold",
             color="#fae8ff",
-            bbox=dict(boxstyle="round,pad=0.25", facecolor="#1e1b4b", edgecolor="#c026d3", alpha=0.9),
+            ha="left" if to_right else "right",
+            va="bottom",
+            bbox=dict(boxstyle="round,pad=0.28", facecolor="#1e1b4b", edgecolor="#c026d3", alpha=0.92),
+            arrowprops=dict(arrowstyle="-", color="#c026d3", linewidth=0.8, alpha=0.8),
+            zorder=7,
         )
 
     # Skala sumbu X (Azimut)
@@ -322,18 +333,31 @@ def fast_render_plot_image(azimuths, elevations, dip_deg, target_az=None, target
     ax.set_xticks(x_ticks)
     ax.set_xticklabels(x_labels, fontsize=8, color="#cbd5e1")
 
-    # Skala sumbu Y (Elevasi 0 s.d 20 derajat) + cm sesuai kalibrasi acuan falak 30cm
-    ax.set_ylim(0.0, 20.0)
-    y_ticks = [0, 5, 10, 15, 20]
-    y_labels = [f"+{y}° / {CALIB_DEG_CM[y]} cm" if y > 0 else "0° / 0,00 cm" for y in y_ticks]
+    # Skala sumbu Y menyesuaikan data agar kurva rendah tidak menempel di dasar
+    el_max = float(np.max(el_arr)) if el_arr.size else 0.0
+    y_top = max(5.0, min(20.0, math.ceil((el_max + 1.0) / 5.0) * 5.0))
+    ax.set_ylim(0.0, y_top)
+    y_step = 5.0 if y_top >= 15.0 else (2.5 if y_top >= 7.5 else 1.0)
+    y_ticks = list(np.arange(0.0, y_top + 1e-6, y_step))
+
+    def format_y_tick(val):
+        cm = 30.0 * math.tan(math.radians(abs(val)))
+        return f"+{val:.0f}° / {cm:.2f} cm".replace(".", ",") if val > 0 else "0° / 0,00 cm"
+
+    y_labels = [format_y_tick(y) for y in y_ticks]
     ax.set_yticks(y_ticks)
     ax.set_yticklabels(y_labels, fontsize=8, color="#f8fafc")
 
-    ax.set_xlabel("Rentang Azimut Bidikan (°)", fontsize=8.5, fontweight="bold", color="#94a3b8")
-    ax.set_ylabel("Elevasi Relatif / Skala Falak (° / cm)", fontsize=8.5, fontweight="bold", color="#94a3b8")
-    ax.set_title("Grafik Elevasi Relatif vs Azimut", fontsize=9.5, fontweight="bold", color="#38bdf8", pad=6)
-    ax.grid(True, linestyle="--", alpha=0.4, color="#334155")
-    ax.legend(loc="upper right", fontsize=7.5, framealpha=0.85)
+    ax.set_xlabel("Rentang Azimut Bidikan (°)", fontsize=8.5, fontweight="bold", color="#94a3b8", labelpad=2)
+    ax.set_ylabel("Elevasi Relatif / Skala Falak (° / cm)", fontsize=8.5, fontweight="bold", color="#94a3b8", labelpad=4)
+    ax.set_title("Grafik Elevasi Relatif vs Azimut", fontsize=9.5, fontweight="bold", color="#38bdf8", pad=8)
+    ax.grid(True, linestyle="--", alpha=0.35, color="#334155", linewidth=0.7)
+    ax.tick_params(axis="both", length=2.5, pad=2)
+    for spine in ax.spines.values():
+        spine.set_color("#334155")
+        spine.set_linewidth(0.8)
+    ax.legend(loc="upper right", fontsize=7, framealpha=0.9, borderpad=0.4,
+              labelspacing=0.35, handlelength=1.6)
 
     buf = io.BytesIO()
     fig.savefig(buf, format="png", facecolor=fig.get_facecolor(), dpi=120)

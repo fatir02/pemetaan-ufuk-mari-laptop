@@ -83,7 +83,7 @@ function renderProminentObjects(objects) {
     aimBtn.title = 'Arahkan penanda azimut ke objek ini';
     aimBtn.onclick = (e) => {
       e.stopPropagation();
-      jumpToAzimuth(obj.azimuth);
+      jumpToAzimuth(obj.azimuth, idx);
     };
 
     chip.appendChild(badge);
@@ -158,12 +158,13 @@ async function applyObjectNames(silent) {
   }
 }
 
-function jumpToAzimuth(azVal) {
+function jumpToAzimuth(azVal, objectIndex) {
   const slider = document.getElementById('sliderAz');
   if (slider) {
     slider.value = azVal.toFixed(2);
   }
   onSliderTargetChanged(azVal);
+
   // Tandai visual chip yang aktif
   document.querySelectorAll('.prominent-chip').forEach(btn => {
     if (Math.abs(parseFloat(btn.dataset.az) - azVal) < 0.15) {
@@ -172,5 +173,60 @@ function jumpToAzimuth(azVal) {
       btn.classList.remove('chip-active');
     }
   });
+
+  // Tentukan objek yang dibidik: pakai indeks eksplisit, atau cari yang terdekat
+  let idx = Number.isInteger(objectIndex) ? objectIndex : -1;
+  if (idx < 0) {
+    const objs = window.__prominentObjectsData || [];
+    let best = -1, bestDiff = Infinity;
+    objs.forEach((o, i) => {
+      const d = Math.abs(Number(o.azimuth) - azVal);
+      if (d < bestDiff) { bestDiff = d; best = i; }
+    });
+    if (best >= 0 && bestDiff < 0.6) idx = best;
+  }
+
+  // Langsung buka fullscreen pada titik yang dibidik
+  openSkylineEditor(idx);
+  if (idx >= 0) {
+    focusSkyObject(idx);
+    // Marker dirender ulang oleh focusSkyObject, jadi label ditulis setelahnya
+    requestAnimationFrame(() => showSkyTargetName(idx));
+  }
+}
+
+// Tampilkan nama objek tepat pada titik bidik di dalam editor fullscreen
+function showSkyTargetName(idx) {
+  const tip = document.getElementById('skylineTooltip');
+  if (!tip) return;
+  const objs = window.__prominentObjectsData || [];
+  const obj = objs[idx];
+  if (!obj) { tip.style.display = 'none'; return; }
+
+  const label = (obj.label && String(obj.label).trim()) || `Objek ${idx + 1}`;
+  const el = Number(obj.elevation);
+  tip.innerHTML =
+    `<b>${escapeHtmlText(label)}</b>` +
+    `<span>${Number(obj.azimuth).toFixed(2)}° · ${(el >= 0 ? '+' : '') + el.toFixed(2)}°</span>`;
+  tip.style.display = 'block';
+
+  const marker = document.querySelector(`#skyVectors .object-marker[data-object="${idx}"]`);
+  const svg = document.getElementById('skylineEditorSvg');
+  if (marker && svg) {
+    const r = marker.getBoundingClientRect();
+    const sr = svg.getBoundingClientRect();
+    const centerX = r.left - sr.left + r.width / 2;
+    const topY = r.top - sr.top;
+    const tipW = tip.offsetWidth || 150;
+    const tipH = tip.offsetHeight || 40;
+    tip.style.left = Math.max(8, Math.min(sr.width - tipW - 8, centerX - tipW / 2)) + 'px';
+    tip.style.top = Math.max(8, topY - tipH - 10) + 'px';
+  }
+}
+
+function escapeHtmlText(s) {
+  return String(s).replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  })[c]);
 }
 
