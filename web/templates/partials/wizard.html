@@ -1,16 +1,16 @@
 <div class="container">
   <!-- NAVIGASI LANGKAH -->
   <div class="stepper" id="wizardStepper" role="tablist" aria-label="Langkah pengamatan">
-    <button type="button" class="step-item active" id="stepBtn1" onclick="goToStep(1)" role="tab" aria-controls="stepPanel1">
+    <button type="button" class="step-item active" id="stepBtn1" onclick="goToStepFromStepper(1)" role="tab" aria-controls="stepPanel1">
       <span class="step-num">1</span><span>Input Citra</span>
     </button>
-    <button type="button" class="step-item" id="stepBtn2" onclick="goToStep(2)" role="tab" aria-controls="stepPanel2" disabled>
+    <button type="button" class="step-item" id="stepBtn2" onclick="goToStepFromStepper(2)" role="tab" aria-controls="stepPanel2" disabled>
       <span class="step-num">2</span><span>Parameter</span>
     </button>
-    <button type="button" class="step-item" id="stepBtn3" onclick="goToStep(3)" role="tab" aria-controls="stepPanel3" disabled>
+    <button type="button" class="step-item" id="stepBtn3" onclick="goToStepFromStepper(3)" role="tab" aria-controls="stepPanel3" disabled>
       <span class="step-num">3</span><span>Hasil</span>
     </button>
-    <button type="button" class="step-item" id="stepBtn4" onclick="goToStep(4)" role="tab" aria-controls="stepPanel4" disabled>
+    <button type="button" class="step-item" id="stepBtn4" onclick="goToStepFromStepper(4)" role="tab" aria-controls="stepPanel4" disabled>
       <span class="step-num">4</span><span>Laporan</span>
     </button>
   </div>
@@ -179,7 +179,7 @@
       <div class="wizard-nav">
         <button type="button" class="wz-btn" disabled>Kembali</button>
         <span class="wz-progress">Langkah 1 dari 4 — Pilih atau ambil citra</span>
-        <button type="button" class="wz-btn primary" onclick="goToStep(2)">Lanjut: Parameter &rarr;</button>
+        <button type="button" class="wz-btn primary" onclick="advanceFromStep1()">Lanjut: Parameter &rarr;</button>
       </div>
     </div>
 
@@ -326,7 +326,7 @@
       <div class="wizard-nav">
         <button type="button" class="wz-btn" onclick="goToStep(2)">&larr; Kembali</button>
         <span class="wz-progress">Langkah 3 dari 4 — Periksa kontur dan grafik</span>
-        <button type="button" class="wz-btn primary" onclick="goToStep(4)">Lanjut: Laporan &rarr;</button>
+        <button type="button" class="wz-btn primary" onclick="advanceToReportStep()">Lanjut: Laporan &rarr;</button>
       </div>
     </div>
 
