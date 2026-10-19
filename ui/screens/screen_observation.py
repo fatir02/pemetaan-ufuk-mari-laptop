@@ -113,8 +113,13 @@ class ScreenObservation(QWidget):
 
         # Kamera & Detektor
         self.cv_detector = HorizonDetector()
-        self.camera_worker = CameraWorker(camera_index=0, is_simulation=True)
+        # Kamera fisik adalah default. Sebelumnya is_simulation=True membuat
+        # tombol live tidak pernah mencoba webcam laptop/USB.
+        self.camera_worker = CameraWorker(camera_index=None, is_simulation=False)
         self.camera_worker.frame_ready.connect(self._on_camera_frame)
+        self.camera_worker.fps_updated.connect(self._on_camera_fps)
+        self.camera_worker.status_changed.connect(self._on_camera_status)
+        self.camera_worker.error_occurred.connect(self._on_camera_error)
 
         # Buffer foto (maksimal 3 slot)
         self.captured_images: List[np.ndarray] = []
@@ -303,6 +308,10 @@ class ScreenObservation(QWidget):
         """)
         self.btn_live_cam.clicked.connect(self._toggle_live_camera)
         cam_bar.addWidget(self.btn_live_cam)
+
+        self.lbl_camera_status = QLabel("Kamera nonaktif")
+        self.lbl_camera_status.setStyleSheet("color:#94a3b8;font-size:11px;")
+        cam_bar.addWidget(self.lbl_camera_status)
 
         self.btn_capture = QPushButton("📸 Potret Frame")
         self.btn_capture.setStyleSheet("""
@@ -535,11 +544,35 @@ class ScreenObservation(QWidget):
     def _toggle_live_camera(self, active: bool):
         """Menghidupkan/mematikan stream kamera live."""
         if active:
-            self.camera_worker.start()
+            if not self.camera_worker.isRunning():
+                self.current_live_frame = None
+                self.lbl_camera_status.setText("Mencari kamera...")
+                self.lbl_camera_status.setStyleSheet("color:#fbbf24;font-size:11px;")
+                self.camera_worker.start()
             self.btn_live_cam.setText("⏹️ Hentikan Kamera")
         else:
             self.camera_worker.stop()
             self.btn_live_cam.setText("🔴 Mode Live Kamera")
+
+    def _on_camera_fps(self, fps: float):
+        self.lbl_camera_status.setText(f"Kamera aktif • {fps:.1f} FPS")
+        self.lbl_camera_status.setStyleSheet("color:#10b981;font-size:11px;font-weight:bold;")
+
+    def _on_camera_status(self, running: bool, message: str):
+        self.lbl_camera_status.setText(message)
+        self.lbl_camera_status.setStyleSheet(
+            f"color:{'#10b981' if running else '#94a3b8'};font-size:11px;"
+        )
+        if not running:
+            self.btn_live_cam.blockSignals(True)
+            self.btn_live_cam.setChecked(False)
+            self.btn_live_cam.setText("🔴 Mode Live Kamera")
+            self.btn_live_cam.blockSignals(False)
+
+    def _on_camera_error(self, message: str):
+        self.lbl_camera_status.setText("Kamera gagal dibuka")
+        self.lbl_camera_status.setStyleSheet("color:#ef4444;font-size:11px;font-weight:bold;")
+        QMessageBox.warning(self, "Kamera Tidak Tersedia", message)
 
     def _on_camera_frame(self, frame_bgr: np.ndarray):
         """Menerima frame dari live kamera."""

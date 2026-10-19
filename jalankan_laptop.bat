@@ -27,7 +27,7 @@ if %errorlevel% neq 0 (
 )
 
 :: 2. Verifikasi dan pasang dependensi otomatis jika belum lengkap
-python -c "import flask, cv2, PyQt5, openpyxl, pypdfium2, reportlab, matplotlib, scipy, numpy, serial" >nul 2>&1
+python -c "import flask, cv2, PyQt5, openpyxl, pypdfium2, reportlab, matplotlib, scipy, numpy, serial, webview" >nul 2>&1
 if %errorlevel% neq 0 (
     echo [INFO] Terdeteksi pustaka yang dibutuhkan belum lengkap terpasang.
     echo Sedang menginstal dependensi dari requirements.txt secara otomatis...
@@ -49,8 +49,8 @@ if %errorlevel% neq 0 (
 )
 
 echo  Pilih mode antarmuka:
-echo  [1] Web App Laptop (Browser: http://127.0.0.1:5000) [Direkomendasikan]
-echo  [2] Native GUI Desktop (PyQt5)
+echo  [1] Aplikasi Terbaru seperti EXE (Web App Mode) [Direkomendasikan]
+echo  [2] Native GUI Lama (PyQt5 / Legacy)
 echo  [3] Uji Sistem Otomatis (test_app.py)
 echo  [4] Pasang / Perbarui Dependensi (pip install -r requirements.txt)
 echo.
@@ -61,17 +61,15 @@ if "%pilihan%"=="" set pilihan=1
 
 if "%pilihan%"=="1" (
     echo.
-    echo Menjalankan Web App Laptop...
-    echo Buka browser di http://127.0.0.1:5000
-    start http://127.0.0.1:5000
-    python web_app.py
+    echo Menjalankan aplikasi terbaru seperti release EXE...
+    python main.py
     goto end
 )
 
 if "%pilihan%"=="2" (
     echo.
     echo Membuka Desktop GUI PyQt5...
-    python main.py
+    python legacy_desktop.py
     goto end
 )
 

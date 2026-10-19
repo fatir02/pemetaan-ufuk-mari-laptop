@@ -8,6 +8,8 @@ project_dir = os.path.abspath(SPECPATH) if "SPECPATH" in locals() else os.path.d
 added_files = [
     (os.path.join(project_dir, "assets"), "assets"),
     (os.path.join(project_dir, "compass_calibration.json"), "."),
+    # Template UI dipecah (HTML/CSS/JS) dan harus ikut ke dalam EXE.
+    (os.path.join(project_dir, "web", "templates"), os.path.join("web", "templates")),
 ]
 
 hidden_imports = [
@@ -36,6 +38,8 @@ hidden_imports = [
     "core.report_generator",
     "core.sample_generator",
     "web_app",
+    "webview",
+    "webview.platforms.edgechromium",
 ]
 
 a = Analysis(
@@ -47,8 +51,8 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    # PyQt5 & Tkinter tidak dipakai: aplikasi web ini memakai jendela Edge app
-    # mode dan dialog native (ctypes). Tkinter justru terbukti memicu crash
+    # PyQt5 & Tkinter tidak dipakai: aplikasi web memakai pywebview/WebView2
+    # dan dialog native (ctypes). Tkinter justru terbukti memicu crash
     # tcl86t.dll ketika dijalankan bersama thread Flask.
     excludes=[
         "IPython", "jupyter",

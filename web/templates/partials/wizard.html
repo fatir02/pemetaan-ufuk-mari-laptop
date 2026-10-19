@@ -1,0 +1,404 @@
+<div class="container">
+  <!-- NAVIGASI LANGKAH -->
+  <div class="stepper" id="wizardStepper" role="tablist" aria-label="Langkah pengamatan">
+    <button type="button" class="step-item active" id="stepBtn1" onclick="goToStep(1)" role="tab" aria-controls="stepPanel1">
+      <span class="step-num">1</span><span>Input Citra</span>
+    </button>
+    <button type="button" class="step-item" id="stepBtn2" onclick="goToStep(2)" role="tab" aria-controls="stepPanel2" disabled>
+      <span class="step-num">2</span><span>Parameter</span>
+    </button>
+    <button type="button" class="step-item" id="stepBtn3" onclick="goToStep(3)" role="tab" aria-controls="stepPanel3" disabled>
+      <span class="step-num">3</span><span>Hasil</span>
+    </button>
+    <button type="button" class="step-item" id="stepBtn4" onclick="goToStep(4)" role="tab" aria-controls="stepPanel4" disabled>
+      <span class="step-num">4</span><span>Laporan</span>
+    </button>
+  </div>
+
+  <div class="wizard-body">
+
+    <!-- ============ LANGKAH 1: INPUT CITRA ============ -->
+    <div class="step-panel active" id="stepPanel1" role="tabpanel" aria-labelledby="stepBtn1">
+      <!-- KARTU 1: PENGAMBILAN CITRA & KAMERA -->
+      <div class="card">
+        <div class="card-title">
+          <span>1. Input Citra</span>
+          <span class="badge badge-info" id="statusBadgeInput">Siap</span>
+        </div>
+
+        <div class="grid-2">
+          <button type="button" class="btn btn-secondary btn-sm" onclick="stopLiveCamera(); document.getElementById('galleryInput').click()">
+            Buka Berkas Citra
+          </button>
+          <button type="button" class="btn btn-primary btn-sm" onclick="startLiveCamera()">
+            Kamera Laptop
+          </button>
+        </div>
+
+        <input type="file" id="galleryInput" accept="image/*" multiple style="display: none;" onchange="onFileSelected(this)">
+
+        <div id="liveCamWrapper">
+          <!-- Pilihan Sumber Perangkat Kamera (Muncul saat kamera aktif seperti semula) -->
+          <div style="background: rgba(15, 23, 42, 0.95); padding: 8px 12px; display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; border-bottom: 1px solid #334155;">
+            <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+              <span style="font-size: 0.78rem; color: #38bdf8; font-weight: bold;">Sumber:</span>
+              <select id="cameraSourceSelect" onchange="onCameraDeviceSelected(this.value)" style="width: auto; max-width: 250px; padding: 4px 8px; font-size: 0.75rem; background: #1a2436; border: 1px solid #334155; border-radius: 6px; color: #ffffff;">
+                <option value="">Deteksi Kamera...</option>
+              </select>
+              <button type="button" id="btnRefreshCam" onclick="refreshCameraDevices()" title="Cari ulang kamera USB yang baru dicolokkan" style="background: #0284c7; border: 1px solid #38bdf8; border-radius: 5px; color: #ffffff; padding: 3px 8px; font-size: 0.74rem; cursor: pointer; display: inline-flex; align-items: center; gap: 3px; font-weight: 600;">
+                Segarkan
+              </button>
+            </div>
+            <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+              <button type="button" onclick="toggleDigicamGuide()" style="background: none; border: none; color: #fbbf24; font-size: 0.74rem; cursor: pointer; text-decoration: underline; font-weight: 600;">
+                Petunjuk Kamera Saku
+              </button>
+              <button type="button" onclick="toggleHpCameraGuide()" style="background: none; border: none; color: #38bdf8; font-size: 0.74rem; cursor: pointer; text-decoration: underline;">
+                Panduan Kamera Ponsel
+              </button>
+            </div>
+          </div>
+
+          <!-- Petunjuk Kamera Digicam / Pocket -->
+          <div id="digicamGuide" style="display: none; background: #172554; padding: 10px 14px; border-bottom: 1px solid #3b82f6; font-size: 0.75rem; color: #e2e8f0; line-height: 1.5;">
+            <b style="color: #fbbf24; display: block; margin-bottom: 4px;">Petunjuk Kamera Saku USB:</b>
+            <p>Jika layar kamera menampilkan tulisan <b>"Penyimpanan Massal"</b>, kamera saat ini masih berfungsi sebagai <i>Flashdisk</i> (akses SD card), bukan Webcam. Agar muncul di pilihan sumber:</p>
+            <ul style="margin: 4px 0 6px 18px; padding: 0;">
+              <li><b>Opsi 1 (Colok Ulang):</b> Cabut kabel USB dan colok kembali. Saat layar kamera menyala, gunakan tombol <b>Panah Bawah / Atas</b> di kamera untuk memilih <b>"Kamera PC" (PC Camera)</b>, lalu tekan <b>OK</b>.</li>
+              <li><b>Opsi 2 (Tombol Kamera):</b> Saat layar kamera bertuliskan "Penyimpanan Massal", coba tekan 1x tombol <b>Power</b>, tombol <b>Mode</b>, atau tombol <b>Shutter</b> pada kamera untuk berganti ke mode Webcam.</li>
+              <li><b>Opsi 3 (Menu Kamera):</b> Cabut kabel USB, nyalakan kamera, buka <b>Menu &gt; Pengaturan (Setup) &gt; Mode USB</b>, ubah ke <b>"Kamera PC"</b>, lalu colokkan kembali kabel USB ke laptop.</li>
+            </ul>
+            <p style="color: #38bdf8; margin-top: 4px;">Setelah mode kamera beralih ke Kamera PC, klik tombol <b>Segarkan</b> di atas. Kamera akan otomatis muncul sebagai <b>GENERAL-A-VIDEO / Kamera Saku USB</b>.</p>
+          </div>
+
+          <!-- Petunjuk Cepat Hubungkan HP -->
+          <div id="hpCamGuide" style="display: none; background: #0f172a; padding: 10px 14px; border-bottom: 1px solid #233147; font-size: 0.75rem; color: #cbd5e1; line-height: 1.5;">
+            <b style="color: #38bdf8; display: block; margin-bottom: 4px;">Koneksi Kamera Ponsel ke Laptop:</b>
+            <p>1. Unduh aplikasi <b>Iriun Webcam</b> atau <b>DroidCam</b> di HP & Laptop Anda.</p>
+            <p>2. Sambungkan HP ke Laptop via Wi-Fi yang sama atau kabel USB.</p>
+            <p>3. Kamera HP otomatis terdeteksi pada pilihan <b>Sumber</b> di atas!</p>
+            
+          </div>
+
+          <!-- Banner Peringatan jika Digicam masih dalam mode Penyimpanan Massal -->
+          <div id="digicamNotice" style="display: none; background: #7c2d12; border: 1px solid #ea580c; border-radius: 8px; padding: 10px 14px; margin: 8px 12px; font-size: 0.76rem; color: #ffedd5; line-height: 1.45;">
+            <b style="color: #fef08a;">Kamera Terdeteksi dalam Mode Penyimpanan Massal:</b><br>
+            Kamera tercolok sebagai kartu memori/flashdisk (bukan webcam). Silakan ubah ke mode <b>"Kamera PC"</b> pada kamera (cabut-colok lalu pilih Kamera PC, atau tekan tombol Power/Mode/Shutter di kamera), lalu klik tombol <b>Segarkan</b>.
+          </div>
+
+          <!-- Frame Viewport Kamera Mandiri (Overlay Canvas Terkunci di Dalam Frame Video) -->
+          <div id="liveSensorBanner" style="padding: 7px 12px; margin-bottom: 8px; border-radius: 8px; font-size: 0.78rem; display: flex; align-items: center; justify-content: space-between; background: #1e293b; border: 1px solid #334155; color: #94a3b8;">
+            <span id="sensorBannerText">Memeriksa koneksi sensor...</span>
+            <span id="sensorBannerCalib" style="font-size: 0.72rem; color: #64748b;"></span>
+          </div>
+
+          <!-- Toolbar Kontrol Lensa & Video Kamera Live (Zoom In/Out, Kecerahan, Kontras) -->
+          <div style="background: rgba(15, 23, 42, 0.95); padding: 8px 12px; margin-bottom: 10px; border-radius: 8px; border: 1px solid #334155; display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; font-size: 0.75rem;">
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span style="color: #38bdf8; font-weight: bold;">Zoom:</span>
+              <button type="button" onclick="stepLiveCamZoom(-0.2)" title="Perkecil Zoom" style="background: #1e293b; border: 1px solid #475569; color: #fff; border-radius: 5px; padding: 2px 8px; cursor: pointer; font-weight: bold; font-size: 0.8rem;">-</button>
+              <input type="range" id="camZoomSlider" min="1.0" max="4.0" step="0.1" value="1.0" oninput="setLiveCamZoom(this.value)" style="width: 85px; accent-color: #38bdf8; cursor: pointer;">
+              <button type="button" onclick="stepLiveCamZoom(0.2)" title="Perbesar Zoom" style="background: #1e293b; border: 1px solid #475569; color: #fff; border-radius: 5px; padding: 2px 8px; cursor: pointer; font-weight: bold; font-size: 0.8rem;">+</button>
+              <b id="lblLiveZoomVal" style="color: #38bdf8; font-family: monospace; min-width: 35px;">1.0x</b>
+            </div>
+
+            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+              <div style="display: flex; align-items: center; gap: 4px;">
+                <span style="color: #e2e8f0;">Kecerahan:</span>
+                <input type="range" id="camBrightnessSlider" min="60" max="160" step="5" value="100" oninput="setLiveCamBrightness(this.value)" style="width: 70px; accent-color: #facc15; cursor: pointer;" title="Atur kecerahan video">
+              </div>
+              <div style="display: flex; align-items: center; gap: 4px;">
+                <span style="color: #e2e8f0;">Kontras:</span>
+                <input type="range" id="camContrastSlider" min="60" max="160" step="5" value="100" oninput="setLiveCamContrast(this.value)" style="width: 70px; accent-color: #38bdf8; cursor: pointer;" title="Atur kontras video">
+              </div>
+              <button type="button" onclick="resetLiveCamFilters()" style="background: #1e293b; border: 1px solid #475569; color: #94a3b8; border-radius: 5px; padding: 2px 8px; cursor: pointer; font-size: 0.72rem;" title="Kembalikan Zoom & Pengaturan Video ke Normal">Reset</button>
+            </div>
+          </div>
+
+          <div class="cam-viewport-box">
+            <video id="cameraVideo" playsinline autoplay muted></video>
+            <canvas id="cameraOverlay"></canvas>
+
+            <div class="cam-controls">
+              <button type="button" class="btn-shutter" onclick="captureLiveFrame()" title="Ambil frame foto atau tekan Spasi di keyboard">
+                Ambil Gambar (Spasi)
+              </button>
+              <button type="button" class="btn-zero-tilt" onclick="zeroCurrentTilt()" title="Nolkan kemiringan kamera saat ini sebagai 0.0° Level" style="background: #0f766e; border: 1px solid #14b8a6; color: #ffffff; padding: 6px 12px; font-size: 0.78rem; border-radius: 6px; cursor: pointer; font-weight: bold; display: inline-flex; align-items: center; gap: 4px;">
+                Nolkan Tilt (0.0°)
+              </button>
+              <button type="button" class="btn-fullscreen-cam" onclick="toggleCameraFullscreen()">
+                Layar Penuh
+              </button>
+              <button type="button" class="btn-close-cam" onclick="stopLiveCamera()">
+                Tutup Kamera
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="photo-area" id="dropArea" onclick="stopLiveCamera(); document.getElementById('galleryInput').click()" style="cursor: pointer;" title="Klik untuk membuka file atau seret file gambar ke sini (Bisa Drag & Drop / Ctrl+V Paste)">
+          
+          <p style="font-weight: 700; color: #38bdf8; font-size: 0.88rem;" id="lblPhotoStatus">Belum ada citra dipilih</p>
+          <p style="font-size: 0.74rem; color: #64748b; margin-top: 3px;">Pilih berkas citra atau seret berkas ke area ini</p>
+        </div>
+
+        <img id="rawPreview" class="preview-img" alt="Preview Foto Aktif" onclick="document.getElementById('galleryInput').click()" style="cursor: pointer;" title="Klik foto untuk mengganti gambar">
+
+        <!-- PREVIEW 3 FOTO (SLOT FOTO & PILIHAN FOTO) -->
+        <div class="photo-slots-wrapper">
+          <div class="photo-slots-header">
+            <span class="photo-slots-title">Daftar Slot Citra:</span>
+            <button type="button" class="btn-slot-del" onclick="deleteActivePhotoSlot()" title="Hapus foto pada slot terpilih">Hapus Foto</button>
+          </div>
+          <div class="photo-slots-grid">
+            <div class="slot-card active" id="slotCard0" onclick="selectPhotoSlot(0)">
+              <span class="slot-badge-tag" id="slotBadge0">Slot 1</span>
+              <div class="slot-empty-body" id="slotEmpty0">
+                <span>Slot 1</span>
+              </div>
+              <img id="slotImg0" style="display: none;" alt="Slot 1">
+            </div>
+            <div class="slot-card" id="slotCard1" onclick="selectPhotoSlot(1)">
+              <span class="slot-badge-tag" id="slotBadge1">Slot 2</span>
+              <div class="slot-empty-body" id="slotEmpty1">
+                <span>Slot 2</span>
+              </div>
+              <img id="slotImg1" style="display: none;" alt="Slot 2">
+            </div>
+            <div class="slot-card" id="slotCard2" onclick="selectPhotoSlot(2)">
+              <span class="slot-badge-tag" id="slotBadge2">Slot 3</span>
+              <div class="slot-empty-body" id="slotEmpty2">
+                <span>Slot 3</span>
+              </div>
+              <img id="slotImg2" style="display: none;" alt="Slot 3">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="wizard-nav">
+        <button type="button" class="wz-btn" disabled>Kembali</button>
+        <span class="wz-progress">Langkah 1 dari 4 — Pilih atau ambil citra</span>
+        <button type="button" class="wz-btn primary" onclick="goToStep(2)">Lanjut: Parameter &rarr;</button>
+      </div>
+    </div>
+
+    <!-- ============ LANGKAH 2: PARAMETER BIDIKAN ============ -->
+    <div class="step-panel" id="stepPanel2" role="tabpanel" aria-labelledby="stepBtn2">
+      <!-- KARTU 2: PARAMETER BIDIKAN & SENSOR -->
+      <div class="card">
+        <div class="card-title">
+          <span>2. Parameter Bidikan</span>
+          <button type="button" class="btn btn-secondary btn-sm" style="width: auto;" onclick="getGPS()">Ambil GPS</button>
+        </div>
+
+        <div class="grid-2">
+          <div class="form-group">
+            <label>Azimuth Bidikan (0 - 360°):</label>
+            <input type="number" id="inpAzimuth" value="270.0" step="0.1">
+          </div>
+          <div class="form-group">
+            <label>Kemiringan / Sudut Elevasi (°):</label>
+            <input type="number" id="inpTilt" value="0.0" step="0.1">
+          </div>
+        </div>
+        <div id="compassLiveBadge" style="margin-bottom: 12px; padding: 6px 12px; background: #0f172a; border: 1px solid #334155; border-radius: 8px; font-size: 0.78rem; display: flex; align-items: center; justify-content: space-between;">
+          <span id="compassStatusText" style="color: #94a3b8;">Sensor Kompas: Memeriksa COM7...</span>
+        </div>
+
+        <div class="grid-3">
+          <div class="form-group">
+            <label>Lintang / Lat (°):</label>
+            <input type="text" inputmode="decimal" id="inpLat" value="-7.9800" placeholder="-7.9800" oninput="this.value = this.value.replace(',', '.')">
+            <span style="font-size: 0.68rem; color: #64748b;">LS: minus (-), LU: plus (+)</span>
+          </div>
+          <div class="form-group">
+            <label>Bujur / Lon (°):</label>
+            <input type="text" inputmode="decimal" id="inpLon" value="110.3061" placeholder="110.3061" oninput="this.value = this.value.replace(',', '.')">
+            <span style="font-size: 0.68rem; color: #64748b;">BT: plus (+), BB: minus (-)</span>
+          </div>
+          <div class="form-group">
+            <label>Tinggi (mdpl):</label>
+            <input type="number" id="inpAlt" value="45.0" step="1" placeholder="45">
+            <span style="font-size: 0.68rem; color: #64748b;">Meter dpl (Ketinggian alat)</span>
+          </div>
+        </div>
+        <input type="hidden" id="inpHfov" value="60.0">
+
+        <button type="button" id="btnProcess" class="btn btn-primary" onclick="processImage()" style="margin-top: 6px;">
+          Proses Ekstraksi Kontur
+        </button>
+      </div>
+
+      <div id="loading">
+        <div class="spinner"></div>
+        <p id="loadingText">Memproses kontur profil ufuk...</p>
+      </div>
+
+      <div class="wizard-nav">
+        <button type="button" class="wz-btn" onclick="goToStep(1)">&larr; Kembali</button>
+        <span class="wz-progress">Langkah 2 dari 4 — Tentukan parameter bidikan</span>
+        <button type="button" class="wz-btn primary" onclick="processImage()">Proses &amp; Lanjut &rarr;</button>
+      </div>
+    </div>
+
+    <!-- ============ LANGKAH 3: HASIL ANALISIS ============ -->
+    <div class="step-panel" id="stepPanel3" role="tabpanel" aria-labelledby="stepBtn3">
+
+      <!-- WORKSPACE PLACEHOLDER SAAT BELUM PROSES -->
+      <div id="rightPlaceholder" class="card placeholder-card">
+        <h3 style="color: #38bdf8; font-size: 1.15rem; margin-bottom: 8px;">Belum Ada Hasil Analisis</h3>
+        <p style="color: #94a3b8; font-size: 0.85rem; max-width: 540px; margin: 0 auto 16px auto; line-height: 1.5;">
+          Kembali ke langkah parameter, lalu klik <b>Proses Ekstraksi Kontur</b>.
+        </p>
+        <button type="button" class="btn btn-primary" style="max-width: 260px; margin: 0 auto;" onclick="goToStep(2)">
+          Ke Parameter Bidikan
+        </button>
+      </div>
+
+      <!-- HASIL OLAH & KURVA PROFIL -->
+      <div id="resultSection" style="display: none;">
+        <div class="card visual-card">
+          <div class="card-title" style="flex-wrap: wrap; gap: 8px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span>3. Hasil</span>
+              <span id="resBadge" class="badge badge-success">Analisis Selesai</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <button type="button" class="btn-tool" onclick="openSkylineEditor()" title="Buka viewer dan koreksi vektor">Layar Penuh & Edit</button>
+              <button type="button" class="btn-tool" onclick="zoomInImg()" title="Perbesar (Zoom In)">+</button>
+              <button type="button" class="btn-tool" onclick="zoomOutImg()" title="Perkecil (Zoom Out)">-</button>
+              <button type="button" class="btn-tool" onclick="resetImgZoom()" title="Kembali ke 100%">100%</button>
+              <span id="zoomLevelBadge" class="badge badge-info" style="font-size: 0.72rem;">100%</span>
+            </div>
+          </div>
+          <div class="img-interactive-container" id="imgInteractiveContainer">
+            <div class="zoom-pan-viewport" id="zoomPanViewport">
+              <img id="resOverlayImg" class="result-img-interactive" alt="Hasil Kontur Ufuk Mar'i" draggable="false" ondblclick="openSkylineEditor()">
+            </div>
+            <div class="interactive-hint-badge">
+              <span>Klik atau seret pada citra untuk mengarahkan titik azimut sasaran</span>
+            </div>
+          </div>
+
+          <!-- POP UP / CHIPS OBJEK MENONJOL (ANGKA DERAJAT HORIZONTAL & VERTIKAL) -->
+          <div id="prominentObjectsContainer" class="prominent-objects-panel" style="display: none;">
+            <div class="prominent-objects-header">
+              <span class="prominent-title">Objek Terdeteksi:</span>
+              <span class="prominent-sub">Ubah nama objek sesuai pengamatan, lalu klik Terapkan</span>
+            </div>
+            <div id="prominentObjectsList" class="prominent-objects-list"></div>
+            <div style="margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+              <button type="button" class="btn btn-primary btn-sm" style="width: auto;" onclick="applyObjectNames()">
+                Terapkan Nama ke Gambar
+              </button>
+              <span id="lblRenameStatus" style="font-size: 0.74rem; color: #94a3b8;"></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- KURVA PROFIL ELEVASI VS AZIMUTH (DENGAN SLIDER ATUR SASARAN LANGSUNG DI DALAM FRAME) -->
+        <div class="card visual-card" style="margin-bottom: 14px;">
+          <div class="card-title">
+            <span>4. Grafik Elevasi vs Azimut</span>
+            <span style="font-size: 0.78rem; color: #38bdf8; font-weight: normal;">Klik kurva untuk mengatur azimut sasaran</span>
+          </div>
+          <div class="img-wrapper" id="plotInteractiveWrapper" style="position: relative; background: #020617; border-radius: 8px; overflow: hidden; border: 1px solid #334155; text-align: center; cursor: crosshair;" title="Klik atau seret pada garis merah grafik untuk membidik azimut sasaran">
+            <img id="resPlotImg" style="width: 100%; max-height: 400px; object-fit: contain; display: block; user-select: none;" alt="Grafik Profil Elevasi vs Azimuth" draggable="false">
+          </div>
+
+          <div class="slider-container" style="margin-top: 12px; padding: 10px 14px; background: #0f172a; border: 1px solid #1e293b; border-radius: 8px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+              <label style="margin: 0; font-size: 0.82rem; color: #cbd5e1; font-weight: 600;">Titik Azimut Sasaran:</label>
+              <b id="lblSliderAz" style="color: #38bdf8; font-size: 1.05rem; background: #020617; padding: 2px 10px; border-radius: 6px; border: 1px solid #334155;">270.00°</b>
+            </div>
+            <input type="range" id="sliderAz" min="240.0" max="300.0" step="0.05" value="270.0" oninput="onSliderTargetChanged(this.value)">
+            <div style="display: flex; justify-content: space-between; font-size: 0.72rem; color: #64748b; margin-top: 4px;">
+              <span id="lblMinAz">240.0°</span>
+              <span>Tengah (Barat)</span>
+              <span id="lblMaxAz">300.0°</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="wizard-nav">
+        <button type="button" class="wz-btn" onclick="goToStep(2)">&larr; Kembali</button>
+        <span class="wz-progress">Langkah 3 dari 4 — Periksa kontur dan grafik</span>
+        <button type="button" class="wz-btn primary" onclick="goToStep(4)">Lanjut: Laporan &rarr;</button>
+      </div>
+    </div>
+
+    <!-- ============ LANGKAH 4: EVALUASI & LAPORAN ============ -->
+    <div class="step-panel" id="stepPanel4" role="tabpanel" aria-labelledby="stepBtn4">
+      <!-- KARTU 4: FORM EVALUASI LAPANGAN & PENERBITAN LAPORAN PDF -->
+      <div class="card" id="evalCard" style="border: 1px solid #0284c7;">
+        <div class="card-title" style="border-bottom: 1px solid #233147; padding-bottom: 8px;">
+          <span>4. Evaluasi &amp; Penerbitan Laporan</span>
+        </div>
+
+        <div class="grid-2">
+          <div class="form-group">
+            <label>Judul Laporan / Berita Acara:</label>
+            <input type="text" id="editReportTitle" value="BERITA ACARA & LAPORAN PEMETAAN PROFIL UFUK MAR'I">
+          </div>
+          <div class="form-group">
+            <label>Nama Instansi / Laboratorium:</label>
+            <input type="text" id="editInstansi" value="FAKULTAS SYARIAH - LABORATORIUM ASTRONOMI & ILMU FALAK">
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div class="form-group">
+            <label>Nama Lokasi / Pos Observasi Falak:</label>
+            <input type="text" id="editLocation" value="Pos Observasi Falak (Laptop)">
+          </div>
+          <div class="form-group">
+            <label>Petugas Pengamat / Tim Falak:</label>
+            <input type="text" id="editObserver" value="Tim Falak & Astronomi">
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div class="form-group">
+            <label>Evaluasi</label>
+            <textarea id="textRec" rows="3" placeholder="Evaluasi kelayakan pengamatan..."></textarea>
+          </div>
+          <div class="form-group">
+            <label>Catatan Pengamat</label>
+            <textarea id="textDesc" rows="3" placeholder="Deskripsi hasil analisis ufuk..."></textarea>
+          </div>
+        </div>
+
+        <div style="background: #0f172a; border: 1px solid #1e293b; border-radius: 10px; padding: 12px; margin-top: 6px;">
+          <p style="color: #38bdf8; font-size: 0.78rem; font-weight: bold; margin-bottom: 8px; letter-spacing: 0.5px;">
+            Penerbitan Berkas &amp; Dokumen
+          </p>
+
+          <div class="grid-2">
+            <button type="button" class="btn btn-success" onclick="openReportPreview()" style="padding: 12px; font-size: 0.9rem;">
+              Preview Laporan PDF
+            </button>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="openDataTableModal()">
+              Buka Tabel &amp; Ekspor Data
+            </button>
+          </div>
+
+          <button type="button" class="btn btn-secondary btn-sm" onclick="resetObservation()" style="margin-top: 8px;">
+            Mulai Pengamatan Baru
+          </button>
+        </div>
+
+      </div>
+
+      <div class="wizard-nav">
+        <button type="button" class="wz-btn" onclick="goToStep(3)">&larr; Kembali</button>
+        <span class="wz-progress">Langkah 4 dari 4 — Lengkapi laporan</span>
+        <button type="button" class="wz-btn primary" onclick="openReportPreview()">Preview PDF</button>
+      </div>
+    </div>
+
+  </div>
+
+</div>

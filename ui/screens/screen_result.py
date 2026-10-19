@@ -14,11 +14,12 @@ import numpy as np
 
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
-    QPushButton, QFrame, QSlider, QSplitter, QScrollArea, QLineEdit
+    QPushButton, QFrame, QSlider, QSplitter, QScrollArea, QLineEdit,
+    QInputDialog,
 )
 from PyQt5.QtCore import Qt, pyqtSignal, QRectF
 
-from core.falak_calc import classify_obstacle, format_dms
+from core.falak_calc import classify_obstacle, format_dms, pixel_to_azimuth_elevation
 from ui.widgets.image_viewer import InteractiveImageViewer, FullscreenImageViewer
 from ui.widgets.plot_canvas import HorizonPlotCanvas
 
@@ -272,17 +273,195 @@ class ScreenResult(QWidget):
         l.addWidget(lbl_v)
         return row
 
-    def _open_fullscreen_image(self, _x: int = 0, _y: int = 0, focus_rect: Optional[QRectF] = None):
+    def _open_fullscreen_image(
+        self,
+        _x: int = 0,
+        _y: int = 0,
+        focus_rect: Optional[QRectF] = None,
+        selected_range=None,
+    ):
         """Buka overlay hasil dalam viewer fullscreen interaktif."""
-        image = self.image_viewer.get_cv_image()
+        # Semua mode fullscreen menggunakan foto mentah dan layer vektor
+        # dinamis. Overlay bitmap hanya dipakai pada panel preview kecil.
+        image = None
+        horizon_y = None
+        target_x = None
+        obstacles = None
+        if self.data_package is not None:
+            raw = self.data_package.get("raw_image")
+            if raw is not None:
+                image = raw.copy()
+                profile = self.data_package["profile_data"]
+                horizon_y = profile.get("horizon_y")
+                obstacles = profile.get("prominent_obstacles", [])
+                azimuths = profile.get("azimuths")
+                if azimuths is not None and len(azimuths):
+                    target_x = int(np.argmin(np.abs(np.asarray(azimuths) - self.target_azimuth)))
+        if image is None:
+            image = self.image_viewer.get_cv_image()
         if image is None:
             return
         # Simpan referensi agar dialog non-modal tidak dihapus oleh garbage
         # collector dan pengguna tetap dapat menutupnya lewat Esc/F11/tombol.
         if getattr(self, "fullscreen_viewer", None) is not None:
             self.fullscreen_viewer.close()
-        self.fullscreen_viewer = FullscreenImageViewer(image, self, focus_rect=focus_rect)
+        self.fullscreen_viewer = FullscreenImageViewer(
+            image,
+            self,
+            focus_rect=focus_rect,
+            horizon_y=horizon_y,
+            selected_range=selected_range,
+            target_x=target_x,
+            obstacles=obstacles,
+        )
+        self.fullscreen_viewer.view.horizon_edited.connect(self._save_manual_horizon)
+        self.fullscreen_viewer.view.add_object_requested.connect(self._add_manual_object)
+        self.fullscreen_viewer.view.obstacle_range_edited.connect(self._save_object_range)
         self.fullscreen_viewer.showFullScreen()
+
+    def _save_object_range(self, index: int, x_start: int, x_end: int):
+        """Simpan perubahan lebar penanda H dan rentang azimut objek."""
+        if self.data_package is None:
+            return
+        profile = self.data_package["profile_data"]
+        objects = profile.get("prominent_obstacles", [])
+        if not (0 <= index < len(objects)):
+            return
+        width = len(profile["azimuths"])
+        xs = max(0, min(width - 1, int(x_start)))
+        xe = max(xs + 1, min(width - 1, int(x_end)))
+        obj = objects[index]
+        obj["x_start"], obj["x_end"] = xs, xe
+        obj["az_start"] = float(profile["azimuths"][xs])
+        obj["az_end"] = float(profile["azimuths"][xe])
+        obj["is_manual_range"] = True
+        obj["text"] = (
+            f"{obj.get('label', 'Halangan Ufuk')}: Az {obj['az_start']:.2f}-"
+            f"{obj['az_end']:.2f} deg | Alt {obj.get('elevation', 0):+.2f} deg"
+        )
+        obj["short_text"] = (
+            f"Az {obj['az_start']:.2f}°-{obj['az_end']:.2f}°, "
+            f"Alt {obj.get('elevation', 0):+.2f}°"
+        )
+        self._refresh_overlay_with_object_names()
+        self._populate_object_editors()
+
+    def _recalculate_profile_from_horizon(self, horizon_y):
+        """Sinkronkan elevasi profil setelah koreksi garis manual."""
+        if self.data_package is None:
+            return
+        profile = self.data_package["profile_data"]
+        raw = self.data_package.get("raw_image")
+        if raw is None:
+            return
+        height, width = raw.shape[:2]
+        horizon = np.clip(np.asarray(horizon_y, dtype=np.float64), 0, height - 1)
+        azimuths, absolute_elevations = pixel_to_azimuth_elevation(
+            x=np.arange(width),
+            y=horizon,
+            img_w=width,
+            img_h=height,
+            az_center=float(profile.get("az_center", self.data_package["azimuth"])),
+            hfov=float(profile.get("hfov", 15.0)),
+            vfov=profile.get("vfov"),
+            tilt_center=float(profile.get("tilt_center", self.data_package["elevation"])),
+        )
+        elevations = np.asarray(absolute_elevations, dtype=np.float64)
+        baseline = float(np.min(elevations))
+        elevations -= baseline
+        profile["horizon_y"] = horizon
+        profile["azimuths"] = np.asarray(azimuths, dtype=np.float64)
+        profile["elevations"] = elevations
+        profile["baseline_raw_elevation"] = baseline
+        profile["stats"].update({
+            "min_elevation": float(np.min(elevations)),
+            "min_azimuth": float(profile["azimuths"][int(np.argmin(elevations))]),
+            "max_elevation": float(np.max(elevations)),
+            "max_azimuth": float(profile["azimuths"][int(np.argmax(elevations))]),
+            "mean_elevation": float(np.mean(elevations)),
+        })
+        for obj in profile.get("prominent_obstacles", []):
+            x = max(0, min(width - 1, int(obj.get("x", 0))))
+            obj["y"] = int(round(horizon[x]))
+            obj["elevation"] = float(elevations[x])
+
+    def _save_manual_horizon(self, horizon_y):
+        self._recalculate_profile_from_horizon(horizon_y)
+        self._refresh_overlay_with_object_names()
+        self._update_analysis_at_azimuth(self.target_azimuth)
+
+    def _add_manual_object(self, x: int, y: int):
+        """Tambah objek yang terlewat melalui titik yang dipilih pengguna."""
+        if self.data_package is None:
+            return
+        labels = ["Menara/Antena", "Vegetasi/Pohon", "Bangunan/Atap", "Halangan Ufuk"]
+        label, accepted = QInputDialog.getItem(
+            self,
+            "Tambah Objek Skyline",
+            "Pilih jenis objek pada titik ini:",
+            labels,
+            0,
+            False,
+        )
+        if not accepted:
+            return
+        profile = self.data_package["profile_data"]
+        horizon = np.asarray(profile["horizon_y"], dtype=np.float64).copy()
+        width = len(horizon)
+        x = max(0, min(width - 1, int(x)))
+        radius = max(3, int(round(width * 0.004)))
+        lo, hi = max(0, x - radius), min(width, x + radius + 1)
+        # Titik pilihan menjadi pucuk; transisi Gaussian menyambungkannya secara
+        # halus ke kontur lama sehingga tidak membentuk patahan vertikal kasar.
+        offsets = np.arange(lo, hi) - x
+        weights = np.exp(-0.5 * (offsets / max(1.0, radius * 0.48)) ** 2)
+        horizon[lo:hi] = np.minimum(horizon[lo:hi], horizon[lo:hi] * (1.0 - weights) + float(y) * weights)
+        self._recalculate_profile_from_horizon(horizon)
+
+        azimuths = profile["azimuths"]
+        elevations = profile["elevations"]
+        class_keys = {
+            "Menara/Antena": "tower_antenna",
+            "Vegetasi/Pohon": "vegetation",
+            "Bangunan/Atap": "building_roof",
+            "Halangan Ufuk": "skyline_obstacle",
+        }
+        objects = profile.setdefault("prominent_obstacles", [])
+        obj = {
+            "id": len(objects) + 1,
+            "x": x,
+            "y": int(round(horizon[x])),
+            "x_start": lo,
+            "x_end": hi - 1,
+            "azimuth": float(azimuths[x]),
+            "az_start": float(azimuths[lo]),
+            "az_end": float(azimuths[hi - 1]),
+            "elevation": float(elevations[x]),
+            "prominence": float(max(0.0, elevations[x] - np.median(elevations[lo:hi]))),
+            "prominence_px": float(max(0.0, np.median(horizon[lo:hi]) - horizon[x])),
+            "height_px": float(max(0.0, np.median(horizon[lo:hi]) - horizon[x])),
+            "object_class": class_keys[label],
+            "auto_label": label,
+            "label": label,
+            "source": "manual_annotation",
+            "is_manual": True,
+            "text": f"{label}: Az {azimuths[lo]:.2f}-{azimuths[hi - 1]:.2f} deg | Alt {elevations[x]:+.2f} deg",
+            "short_text": f"Az {azimuths[lo]:.2f}°-{azimuths[hi - 1]:.2f}°, Alt {elevations[x]:+.2f}°",
+        }
+        objects.append(obj)
+        profile["stats"]["prominent_count"] = len(objects)
+        self._refresh_overlay_with_object_names()
+        self._populate_object_editors()
+        # Segarkan layer viewer saat ini dan kembali ke navigasi agar marker
+        # baru langsung bisa diklik untuk melihat namanya.
+        if getattr(self, "fullscreen_viewer", None) is not None:
+            view = self.fullscreen_viewer.view
+            view.set_horizon_overlay(
+                profile["horizon_y"],
+                target_x=int(np.argmin(np.abs(profile["azimuths"] - self.target_azimuth))),
+                obstacles=objects,
+            )
+            self.fullscreen_viewer._set_mode("navigate")
 
     def _focus_skyline_object(self, index: int):
         """Buka fullscreen dan fokuskan citra pada rentang azimut objek."""
@@ -323,7 +502,10 @@ class ScreenResult(QWidget):
             + float(obj.get("az_end", obj.get("azimuth", self.target_azimuth)))
         ) / 2.0
         self.target_slider.setValue(int(round(az_mid * 100)))
-        self._open_fullscreen_image(focus_rect=focus_rect)
+        self._open_fullscreen_image(
+            focus_rect=focus_rect,
+            selected_range=(int(round(x0)), int(round(x1))),
+        )
 
     def load_data(self, data_package: Dict[str, Any]):
         """Memuat paket data ekstraksi dari Layar 2."""
