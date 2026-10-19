@@ -11,22 +11,18 @@ function goToStep(step) {
 function syncHeaderNav() {
   const prev = document.getElementById('navPrevBtn');
   const next = document.getElementById('navNextBtn');
+  const label = document.getElementById('navStepLabel');
   if (prev) prev.disabled = wizardStep <= 1;
+  if (label) label.textContent = wizardStep + ' / ' + WIZARD_MAX_STEP;
   if (!next) return;
-
-  if (wizardStep === 1) {
-    next.innerHTML = 'Lanjut &rarr;';
-    next.disabled = false;
-  } else if (wizardStep === 2) {
-    next.innerHTML = 'Proses &rarr;';
-    next.disabled = false;
-  } else if (wizardStep === 3) {
-    next.innerHTML = 'Laporan &rarr;';
-    next.disabled = false;
-  } else {
-    next.innerHTML = 'Preview PDF';
-    next.disabled = false;
-  }
+  next.disabled = false;
+  const titles = {
+    1: 'Lanjut ke parameter',
+    2: 'Proses ekstraksi kontur',
+    3: 'Lanjut ke laporan',
+    4: 'Preview laporan PDF'
+  };
+  next.title = titles[wizardStep] || 'Lanjut';
 }
 
 function wizardNext() {

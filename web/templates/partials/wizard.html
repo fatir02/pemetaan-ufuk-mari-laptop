@@ -1,4 +1,15 @@
 <div class="container">
+  <!-- NAVIGASI MENGAMBANG (PILL) DI POJOK KANAN BAWAH -->
+  <div class="nav-pill" id="navPill">
+    <button type="button" class="nav-pill-btn" id="navPrevBtn" onclick="wizardPrev()" disabled title="Kembali ke langkah sebelumnya">
+      &larr;
+    </button>
+    <span class="nav-pill-label" id="navStepLabel">1 / 4</span>
+    <button type="button" class="nav-pill-btn primary" id="navNextBtn" onclick="wizardNext()" title="Lanjut ke langkah berikutnya">
+      &rarr;
+    </button>
+  </div>
+
   <div class="wizard-body">
 
     <!-- ============ LANGKAH 1: INPUT CITRA ============ -->
