@@ -154,6 +154,9 @@
       flex-direction: column;
       min-height: 0;
       overflow: hidden;
+      width: 100%;
+      margin: 0 auto;
+      padding: 14px;
     }
     .wizard-body {
       flex: 1 1 auto;
@@ -214,7 +217,7 @@
     .btn-sm { padding: 8px 10px; font-size: 0.8rem; border-radius: 8px; width: 100%; }
     .photo-area {
       border: 2px dashed #334155; border-radius: 12px; padding: 18px 14px; text-align: center;
-      background-color: #0f172a; margin-bottom: 12px;
+      background-color: #0f172a; margin: 14px 0;
     }
     .preview-img {
       width: 100%;
@@ -492,6 +495,14 @@
     @media (min-width: 992px) {
       .result-layout {
         grid-template-columns: 1.05fr 0.95fr;
+        align-items: stretch;
+      }
+      .result-layout > .prominent-objects-panel { grid-column: 1 / -1; }
+    }
+    /* Lebar sedang: tetap dua kolom agar tidak menumpuk tiga bagian */
+    @media (min-width: 800px) and (max-width: 991px) {
+      .result-layout {
+        grid-template-columns: 1fr 1fr;
         align-items: stretch;
       }
       .result-layout > .prominent-objects-panel { grid-column: 1 / -1; }
@@ -842,26 +853,17 @@
       border-top: 1px solid #1e293b;
     }
 
-    /* Media Query Khusus Layar Laptop & Desktop (Lebar >= 992px) */
+    /* ==========================================================
+       Responsif: penyesuaian mengikuti lebar jendela secara langsung
+       ========================================================== */
     @media (min-width: 992px) {
       .container {
         max-width: 1440px;
-        padding: 20px 24px;
+        padding: 16px 24px;
       }
       .header {
-        flex-direction: row;
-        justify-content: space-between;
-        align-items: center;
-        padding: 16px 32px;
-        text-align: left;
+        padding: 12px 28px;
       }
-      .header-brand {
-        justify-content: flex-start;
-      }
-      .header-meta {
-        justify-content: flex-end;
-      }
-      /* Mode Kamera Live Aktif: viewport kamera lebih tinggi */
       body.camera-live-active #cameraVideo {
         height: 560px;
         max-height: calc(100vh - 220px);
@@ -874,10 +876,84 @@
       .grid-4 {
         grid-template-columns: 1fr 1fr;
       }
+    }
+
+    /* Kartu visual menyesuaikan tinggi viewport, bukan tinggi tetap */
+    @media (min-width: 992px) {
       .result-img-interactive {
-        max-height: 255px;
+        max-height: min(38vh, 340px);
       }
       #resPlotImg {
-        max-height: 180px !important;
+        max-height: min(26vh, 220px) !important;
       }
+    }
+    @media (min-width: 1500px) {
+      .result-img-interactive {
+        max-height: min(42vh, 460px);
+      }
+      #resPlotImg {
+        max-height: min(30vh, 300px) !important;
+      }
+    }
+    @media (min-width: 1900px) {
+      .container {
+        max-width: 1680px;
+      }
+    }
+
+    /* Layar pendek: rapatkan jarak vertikal agar tetap satu layar */
+    @media (max-height: 820px) {
+      .container { padding-top: 8px; padding-bottom: 8px; }
+      .visual-card { padding: 10px; }
+      .result-layout > .visual-card > .card-title { margin-bottom: 5px; min-height: 24px; }
+      .prominent-objects-panel { padding: 8px 10px; }
+      .prominent-objects-header { margin-bottom: 6px; }
+      .prominent-actions { margin-top: 6px; }
+    }
+    @media (max-height: 720px) {
+      .header { padding-top: 8px; padding-bottom: 8px; }
+      .header-brand h1 { font-size: 1.05rem; }
+      .header-brand p { display: none; }
+      .header-clock { margin-top: 4px; }
+      .result-img-interactive { max-height: min(30vh, 240px); }
+      #resPlotImg { max-height: min(22vh, 170px) !important; }
+    }
+
+    /* Layar sempit: tumpuk kartu dan sesuaikan kontrol */
+    @media (max-width: 799px) {
+      .container {
+        max-width: 100%;
+        padding: 12px;
+      }
+      .result-layout {
+        grid-template-columns: 1fr;
+        gap: 10px;
+      }
+      /* Dua kartu bertumpuk: batasi tiap visual agar tetap satu layar */
+      .result-img-interactive { max-height: 26vh; }
+      #resPlotImg { max-height: 18vh !important; }
+      .slider-container { margin-top: 5px !important; padding: 6px 10px !important; }
+      .result-layout > .visual-card { padding: 10px; }
+      .result-layout > .visual-card > .card-title { margin-bottom: 6px; min-height: 24px; }
+      /* Panel objek diringkas agar tiga bagian tetap muat satu layar */
+      .prominent-objects-panel { padding: 8px 10px; }
+      .prominent-objects-header { margin-bottom: 6px; }
+      .prominent-objects-list {
+        grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+        max-height: 104px;
+        overflow-y: auto;
+      }
+      .prominent-actions { margin-top: 6px; }
+      .prominent-actions .btn-sm { padding: 5px 9px; font-size: 0.74rem; }
+      .nav-pill { right: 12px; bottom: 12px; }
+    }
+    @media (max-width: 640px) {
+      .container { padding: 10px; }
+      .header-brand h1 { font-size: 1rem; }
+      .header-brand p { font-size: 0.7rem; }
+      .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+      .prominent-objects-list { grid-template-columns: 1fr; }
+      .card { padding: 12px; }
+      .nav-pill { right: 10px; bottom: 10px; padding: 5px 7px; }
+      .nav-pill-btn { width: 32px; height: 32px; }
     }
